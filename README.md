@@ -53,7 +53,7 @@ The skill will guide Claude to create:
 ## Documentation
 
 - [Limio Custom Components Docs](https://docs.limio.com/developers/custom-components/custom-components)
-- [@limio/sdk Reference](https://docs.limio.com/developers/sdk)
+- [@limio/sdk Reference](https://docs.limio.com/developers/limio-sdk/getting-started)
 
 ## License
 
