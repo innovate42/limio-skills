@@ -1,16 +1,18 @@
 ---
 name: limio-component
 description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 2.0.0
+version: 2.1.0
 ---
 
 # Limio Custom Component Creation
 
 Use this skill when creating custom components for the Limio subscription management platform.
 
+**IMPORTANT:** This skill contains all the documentation you need. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly.
+
 ## Component Location
 
-**All custom components must be created in the `/components` directory.**
+**Create components in `./components/` relative to the project root.** If the directory doesn't exist, create it.
 
 ```
 /components/
