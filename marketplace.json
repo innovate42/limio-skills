@@ -1,0 +1,11 @@
+{
+  "name": "limio-skills",
+  "description": "Official Limio skills for Claude Code",
+  "plugins": [
+    {
+      "name": "limio-skills",
+      "description": "Skills for building Limio custom components with React and the @limio/sdk",
+      "path": "."
+    }
+  ]
+}
