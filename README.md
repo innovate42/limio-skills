@@ -7,14 +7,8 @@ A Claude Code plugin providing skills for building custom components on the [Lim
 Add the marketplace and install the plugin:
 
 ```
-/plugin install limio/limio-skills
-```
-
-Or add via marketplace:
-
-```
-/plugin marketplace add limio/limio-skills
-/plugin install limio-skills@limio/limio-skills
+/plugin marketplace add innovate42/limio-skills
+/plugin install limio-skills
 ```
 
 ## Available Skills

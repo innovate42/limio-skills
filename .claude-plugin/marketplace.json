@@ -7,7 +7,10 @@
     {
       "name": "limio-skills",
       "description": "Skills for building Limio custom components with React and the @limio/sdk",
-      "source": "./"
+      "source": {
+        "type": "github",
+        "repo": "innovate42/limio-skills"
+      }
     }
   ]
 }
