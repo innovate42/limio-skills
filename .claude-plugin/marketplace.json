@@ -1,11 +1,15 @@
 {
   "name": "limio-skills",
   "description": "Official Limio skills for Claude Code",
+  "owner": {
+    "name": "Limio",
+    "url": "https://limio.com"
+  },
   "plugins": [
     {
       "name": "limio-skills",
       "description": "Skills for building Limio custom components with React and the @limio/sdk",
-      "path": "."
+      "source": "."
     }
   ]
 }
