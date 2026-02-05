@@ -1,0 +1,5 @@
+{
+  "name": "limio-skills",
+  "version": "1.0.0",
+  "description": "Claude Code skills for building Limio custom components with React and the @limio/sdk"
+}
