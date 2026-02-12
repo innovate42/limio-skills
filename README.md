@@ -38,11 +38,24 @@ Create a pricing card component that displays offers from the campaign
 with a monthly/annual toggle and add to basket functionality
 ```
 
-The skill will guide Claude to create:
-- `package.json` with limioProps config
-- `index.js` React component using SDK hooks
-- `componentStaticProps.js` for props handling
-- `index.css` with styling
+The skill will guide Claude to:
+1. Create the component files:
+   - `package.json` with limioProps config
+   - `index.js` React component using SDK hooks
+   - `componentStaticProps.js` for props handling
+   - `index.css` with styling
+2. Set up a Storybook playground (if not already configured) with mocked `@limio/sdk` hooks
+3. Generate a story with multiple variations based on the component's limioProps
+4. Launch Storybook so you can preview and iterate on the component immediately
+
+## Storybook Playground
+
+The skill automatically sets up a `component-playground/` directory with:
+- Storybook 8 configured with webpack aliases to mock `@limio/sdk`
+- Full mock implementations of all SDK hooks (`useCampaign`, `useBasket`, `useUser`, `useCheckout`, etc.) with realistic sample data
+- Stories for each component with multiple variations
+
+On subsequent runs, the existing playground is reused and only new stories are added.
 
 ## Documentation
 

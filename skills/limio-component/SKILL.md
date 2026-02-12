@@ -1,14 +1,24 @@
 ---
 name: limio-component
 description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 2.1.0
+version: 3.0.0
 ---
 
 # Limio Custom Component Creation
 
 Use this skill when creating custom components for the Limio subscription management platform.
 
-**IMPORTANT:** This skill contains all the documentation you need. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly.
+**IMPORTANT:** This skill contains all the documentation you need for building components. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly. The one exception is checking whether Storybook is already set up (see Storybook section).
+
+## Full Workflow
+
+1. **Create the component** in `./components/` (using the reference sections below)
+2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+3. **If no Storybook exists:** Set up the playground (see "Storybook Setup" section)
+4. **Create a story** for the component with multiple variations
+5. **Install dependencies** if needed: `cd component-playground && npm install`
+6. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
+7. **Show the user** the running Storybook and ask for feedback
 
 ## Component Location
 
@@ -583,3 +593,404 @@ export default MyComponent
 7. **Loading states** - Handle `basketLoading` to prevent double submissions
 8. **Sanitize HTML** - Always use `xss` library for rich text content
 9. **MUI version** - Use 5.16.12 for React 19 compatibility
+10. **Always create stories** - Every component should have a Storybook story with variations
+
+---
+
+## Storybook Setup (One-time)
+
+If `component-playground/.storybook/main.js` does **not** exist, create the full Storybook playground. If it already exists, skip to "Creating a Story".
+
+### Directory Structure
+
+```
+component-playground/
+├── .storybook/
+│   ├── main.js
+│   └── preview.js
+├── packages/
+│   └── limio/
+│       ├── sdk/
+│       │   ├── index.js
+│       │   └── src/
+│       │       └── context.js
+│       ├── shop/
+│       │   └── src/
+│       │       └── shop/
+│       │           └── checkout/
+│       │               └── basket.js
+│       └── internal-checkout-sdk/
+│           └── index.js
+├── src/
+│   └── stories/
+└── package.json
+```
+
+### component-playground/package.json
+
+```json
+{
+  "name": "@limio/component-playground",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "ramda": "^0.28.0",
+    "xss": "^1.0.15"
+  },
+  "scripts": {
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "devDependencies": {
+    "@storybook/addon-essentials": "^8.0.0",
+    "@storybook/addon-interactions": "^8.0.0",
+    "@storybook/addon-links": "^8.0.0",
+    "@storybook/addon-webpack5-compiler-babel": "^1.0.0",
+    "@storybook/blocks": "^8.0.0",
+    "@storybook/react": "^8.0.0",
+    "@storybook/react-webpack5": "^8.0.0",
+    "storybook": "^8.0.0"
+  }
+}
+```
+
+### component-playground/.storybook/main.js
+
+```javascript
+import path, { dirname, join } from "path"
+
+function getAbsolutePath(value) {
+    return dirname(require.resolve(join(value, "package.json")))
+}
+
+const config = {
+    stories: ["../src/**/*.stories.@(js|jsx|ts|tsx)"],
+    addons: [
+        getAbsolutePath("@storybook/addon-webpack5-compiler-babel"),
+        getAbsolutePath("@storybook/addon-essentials"),
+        getAbsolutePath("@storybook/addon-interactions"),
+    ],
+    framework: {
+        name: getAbsolutePath("@storybook/react-webpack5"),
+        options: {},
+    },
+    webpackFinal: async (config) => {
+        config.resolve.alias = {
+            ...config.resolve.alias,
+            "@limio/sdk": path.resolve(__dirname, "..", "packages", "limio", "sdk"),
+            "@limio/sdk/components": path.resolve(__dirname, "..", "packages", "limio", "sdk", "src", "components"),
+            "@limio/shop": path.resolve(__dirname, "..", "packages", "limio", "shop"),
+            "@limio/internal-checkout-sdk": path.resolve(__dirname, "..", "packages", "limio", "internal-checkout-sdk"),
+        }
+        return config
+    }
+}
+
+export default config
+```
+
+### component-playground/.storybook/preview.js
+
+```javascript
+const preview = {
+    parameters: {
+        layout: "fullscreen",
+        controls: {
+            matchers: {
+                color: /(background|color)$/i,
+                date: /Date$/i,
+            },
+        },
+    },
+}
+
+export default preview
+```
+
+### component-playground/packages/limio/sdk/index.js
+
+```javascript
+export * from "./src/context"
+
+export function getPropsFromPackageJson(packageData) {
+    const limioProps = packageData.limioProps || []
+    const defaults = {}
+    limioProps.forEach(prop => {
+        if (prop.default !== undefined) {
+            defaults[prop.id] = prop.default
+        }
+    })
+    return defaults
+}
+```
+
+### component-playground/packages/limio/sdk/src/context.js
+
+```javascript
+import * as React from "react"
+
+const LimioContext = React.createContext({})
+export const ComponentContext = React.createContext({})
+
+// ===== Mock Data =====
+
+const mockOffers = [
+    {
+        id: "offer-monthly-001", name: "Monthly Plan", path: "/offers/monthly", type: "item",
+        data: {
+            attributes: {
+                display_name__limio: "Monthly", display_price__limio: "<p>$9.99/mo</p>",
+                detailed_display_price__limio: "<p>Billed monthly</p>", cta_text__limio: "Subscribe",
+                group__limio: "monthly", best_value__limio: false,
+                offer_features__limio: "<ul><li>Unlimited access</li><li>Cancel anytime</li></ul>",
+                payment_types__limio: ["card"], checkout_description__limio: "Monthly subscription",
+            },
+            price: [{ value: 9.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
+            products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
+            attachments: []
+        }
+    },
+    {
+        id: "offer-annual-002", name: "Annual Plan", path: "/offers/annual", type: "item",
+        data: {
+            attributes: {
+                display_name__limio: "Annual", display_price__limio: "<p><s>$119.88</s> $99.99/yr</p>",
+                detailed_display_price__limio: "<p>Billed annually — save 17%</p>", cta_text__limio: "Subscribe & Save",
+                group__limio: "annual", best_value__limio: true, badge_text__limio: "Best Value",
+                offer_features__limio: "<ul><li>Unlimited access</li><li>Priority support</li><li>Cancel anytime</li></ul>",
+                payment_types__limio: ["card", "paypal"], checkout_description__limio: "Annual subscription",
+            },
+            price: [{ value: 99.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "years" }],
+            products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
+            attachments: []
+        }
+    },
+    {
+        id: "offer-premium-003", name: "Premium Monthly", path: "/offers/premium", type: "item",
+        data: {
+            attributes: {
+                display_name__limio: "Premium", display_price__limio: "<p>$19.99/mo</p>",
+                detailed_display_price__limio: "<p>Billed monthly</p>", cta_text__limio: "Go Premium",
+                group__limio: "monthly", best_value__limio: false,
+                offer_features__limio: "<ul><li>Everything in Standard</li><li>Advanced analytics</li><li>API access</li><li>Dedicated support</li></ul>",
+                payment_types__limio: ["card", "paypal"], checkout_description__limio: "Premium monthly subscription",
+            },
+            price: [{ value: 19.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
+            products: [{ path: "/products/premium", name: "Premium", attributes: { display_name__limio: "Premium Plan", product_code__limio: "PREMIUM" } }],
+            attachments: []
+        }
+    }
+]
+
+const mockBasketItems = [
+    {
+        name: "Monthly Plan", id: "basket-item-001",
+        offer: mockOffers[0], details: "",
+        price: { summary: { headline: "<p>$9.99/mo</p>" }, currency: "USD", amount: 9.99 },
+        products: mockOffers[0].data.products
+    }
+]
+
+const mockUser = {
+    username: "mock-user-001",
+    attributes: { email: "user@example.com", email_verified: true, sub: "mock-user-001" },
+    subscriptions: [{
+        name: "Monthly Plan", status: "active", record_type: "subscription",
+        id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z",
+        offers: [{ name: "Monthly Plan", quantity: 1, price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: [] }],
+        schedule: [{ data: { date: "2024-02-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Monthly Plan" }, status: "pending" }]
+    }],
+    loginStatus: "logged-in", loaded: true, token: "mock-jwt-token"
+}
+
+const dummyContext = {
+    pageBuilder__limio: false,
+    shop: {
+        campaign: { name: "Demo Campaign", path: "/campaigns/demo", attributes: { push_to_checkout__limio: true } },
+        offers: mockOffers,
+        addOns: [],
+        tag: "/tags/demo",
+        basketItems: mockBasketItems,
+        addToBasket: (offer) => console.log("Added to basket:", offer),
+    },
+    user: mockUser
+}
+
+// ===== Hooks =====
+
+export function useCampaign() {
+    React.useContext(LimioContext)
+    const { campaign, offers, addOns } = dummyContext.shop
+    return { campaign, offers, addOns }
+}
+
+export function useBasket() {
+    React.useContext(LimioContext)
+    const { basketItems, addToBasket } = dummyContext.shop
+    return {
+        orderItems: basketItems, basketLoading: false, formattedTotal: "$9.99",
+        initiateCheckout: async (data) => console.log("Checkout initiated:", data),
+        addOfferToBasket: async (data) => console.log("Added:", data),
+        removeFromBasket: async (data) => console.log("Removed:", data),
+        navigateToCheckout: async () => console.log("Navigate to checkout"),
+        clearOrderItems: () => console.log("Cart cleared"),
+    }
+}
+
+export function useUser() {
+    React.useContext(LimioContext)
+    return mockUser
+}
+
+export function useSubscriptions() {
+    React.useContext(LimioContext)
+    return { subscriptions: mockUser.subscriptions }
+}
+
+export function useLimioContext() {
+    React.useContext(LimioContext)
+    return { isInPageBuilder: false }
+}
+
+export function useComponentProps(defaultProps) {
+    const context = React.useContext(ComponentContext)
+    return React.useMemo(() => ({ ...defaultProps, ...context }), [context, defaultProps])
+}
+
+export function useCheckout() {
+    return {
+        useCheckoutSelector: (callback) => callback({
+            order: { orderDate: new Date().toISOString(), basketItems: mockBasketItems, orderItems: mockBasketItems, customerDetails: { firstName: "Test", lastName: "User", email: "user@example.com" } },
+            display: { orderTotal: { orderSubtotal: "$9.99", orderTotal: "$9.99", currency: "USD", taxSummary: [] } }
+        })
+    }
+}
+
+export function groupOffers(offers = [], groupLabels = []) {
+    const groups = {}
+    for (const offer of offers) {
+        const group = offer?.data?.attributes?.group__limio || "other"
+        groups[group] = groups[group] || []
+        groups[group].push(offer)
+    }
+    return Object.keys(groups).map(groupId => {
+        const match = groupLabels.find(g => g.id === groupId) || { id: groupId, label: groupId, thumbnail: "" }
+        return { groupId, id: groupId, label: match.label, offers: groups[groupId], thumbnail: match.thumbnail }
+    })
+}
+
+export function formatCurrencyForCurrentLocale(amount, currency) {
+    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
+}
+
+export function ErrorBoundary({ children }) {
+    return <>{children}</>
+}
+
+// ===== Provider =====
+
+export function LimioProvider({ children, value = dummyContext }) {
+    return <LimioContext.Provider value={value}>{children}</LimioContext.Provider>
+}
+```
+
+### component-playground/packages/limio/shop/src/shop/checkout/basket.js
+
+```javascript
+export function getCurrentBasketId() {
+    return "mock-basket-id"
+}
+```
+
+### component-playground/packages/limio/internal-checkout-sdk/index.js
+
+```javascript
+import { useCheckout } from "@limio/sdk"
+export { useCheckout }
+```
+
+After creating all files, install dependencies:
+```bash
+cd component-playground && npm install
+```
+
+---
+
+## Creating a Story
+
+After creating a component, **always** create a story file at `component-playground/src/stories/<ComponentName>.stories.js`.
+
+### Story Template
+
+```javascript
+import React from "react"
+import { LimioProvider, ComponentContext } from "@limio/sdk"
+import MyComponent from "../../../components/component-name/index"
+
+export default {
+    title: "Component Name",
+    component: MyComponent,
+    parameters: { layout: "fullscreen" },
+    decorators: [
+        (Story, context) => (
+            <LimioProvider>
+                <ComponentContext.Provider value={context.args}>
+                    <Story />
+                </ComponentContext.Provider>
+            </LimioProvider>
+        )
+    ]
+}
+
+// Default — uses limioProps defaults from the component's package.json
+export const Default = {
+    args: {
+        // Copy each limioProps entry: use its "id" as key, "default" as value
+        heading: "Choose Your Plan",
+        primaryColor__limio_color: "#635BFF",
+        showFeatures: true,
+    }
+}
+
+// Create 2-4 additional variations showcasing different configurations
+export const DarkTheme = {
+    args: {
+        ...Default.args,
+        primaryColor__limio_color: "#1a1a2e",
+    }
+}
+
+export const MinimalContent = {
+    args: {
+        ...Default.args,
+        showFeatures: false,
+    }
+}
+```
+
+### Story Creation Rules
+
+1. **Args come from limioProps** — Map each `limioProps` entry in the component's `package.json` to a story arg using its `id` as the key and `default` as the value
+2. **Create meaningful variations** — Each story should demonstrate a different visual state: different themes, with/without optional sections, different content lengths, etc.
+3. **Spread defaults for variations** — Use `...Default.args` and override only what changes
+4. **3-5 stories per component** — Default + 2-4 variations
+5. **Name stories descriptively** — `DarkTheme`, `WithBadges`, `MinimalContent`, `LongContent`, `CustomBranding`, etc.
+6. **Import path** — Components are at `../../../components/<name>/index` relative to the stories directory
+
+---
+
+## Start Storybook & Get Feedback
+
+After creating the component and its story:
+
+```bash
+cd component-playground && npx storybook dev -p 6006
+```
+
+**After starting Storybook, tell the user:**
+- Storybook is running at **http://localhost:6006**
+- List each story variation you created and what it demonstrates
+- Ask if they want any changes to the component or additional variations
+- Keep Storybook running while iterating on feedback
