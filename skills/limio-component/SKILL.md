@@ -1,7 +1,7 @@
 ---
 name: limio-component
 description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 3.0.0
+version: 4.0.0
 ---
 
 # Limio Custom Component Creation
@@ -9,6 +9,8 @@ version: 3.0.0
 Use this skill when creating custom components for the Limio subscription management platform.
 
 **IMPORTANT:** This skill contains all the documentation you need for building components. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly. The one exception is checking whether Storybook is already set up (see Storybook section).
+
+**Official SDK docs:** https://docs.limio.com/developers/limio-sdk
 
 ## Full Workflow
 
@@ -90,6 +92,12 @@ export function useStaticProps() {
     return useComponentProps(defaultComponentProps)
 }
 ```
+
+## Self-Contained Components
+
+Components must be **self-contained** — do NOT import from `../source/utils/` or other internal paths. These rely on modules (like `@limio/shop/src/shop/appConfig.js`) that are not mocked in Storybook and will break.
+
+Instead, use SDK utilities (`formatCurrency`, `formatDate`, `checkActiveOffers`, `getCurrentOffer`, `useSchedule`, etc.) or write small inline helpers within the component itself.
 
 ---
 
@@ -277,6 +285,8 @@ const {
   updateCustomField,
   setCheckoutDisabled,
   validateBasket,
+  updateBasketDetails,
+  selectOfferForSubscriptionUpdate,
 } = useBasket()
 ```
 
@@ -305,6 +315,8 @@ const handleAddToBasket = async (offer) => {
 - `navigateToCheckout()` - Go to checkout page
 - `redeemPromoCode(promoCode)` - Apply discount
 - `removePromoCode(promoCode)` - Remove discount
+- `updateBasketDetails(details)` - Update basket metadata
+- `selectOfferForSubscriptionUpdate(offer)` - Designate offer for subscription change
 
 ---
 
@@ -318,7 +330,7 @@ const { attributes, subscriptions, loginStatus, loaded, token } = useUser()
 ```
 
 **Returns:**
-- `attributes` - User identity: `{ email, auth_time, sub, crm_id, ... }`
+- `attributes` - User identity: `{ email, email_verified, firstName, lastName, sub, crm_id, ... }`
 - `subscriptions` - Array of user's subscriptions
 - `loginStatus` - "logged-in" or other states
 - `loaded` - Boolean for data availability
@@ -335,15 +347,38 @@ const { subscriptions } = useSubscriptions()
 ```javascript
 {
   name: "Premium",
-  status: "active",
-  schedule: [{ date, type, amount, currency, description }],
-  offers: [...],
-  record_type: "subscription",
-  id, ref, reference,
+  status: "active",              // "active" | "cancelled" | etc.
+  id: "sub-...",
+  reference: "1KPEEEJ8RNF8",    // Customer-facing ref
   created: "2024-01-15T...",
-  mode: "production"
+  record_type: "subscription",
+  mode: "production",
+  offers: [                       // Array of offers — the documented access pattern
+    {
+      data: {
+        start: "2024-01-15T...",
+        end: null,                // null if still active
+        record_subtype: "base",   // "discount" = discount offer; anything else (or absent) = standard offer
+        offer: {                  // Full offer object with data.attributes etc.
+          data: {
+            attributes: { display_name__limio, price__limio, term__limio, ... },
+            products: [{ name: "Product Name", attributes: { display_name__limio, product_code__limio } }]
+          }
+        }
+      }
+    }
+  ],
+  schedule: [                    // Payment schedule
+    {
+      id: "schedule-...",        // Unique ID — use as React key
+      data: { date, amount, currency, description, type: "payment" },
+      status: "active"           // "active" | "pending" | "pending-external" | "cancelled"
+    }
+  ]
 }
 ```
+
+**Important:** Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
 
 ### useSubInfo
 ```javascript
@@ -365,7 +400,7 @@ const { nextPaymentAmount, renewalPrice, termStartDate, termEndDate } = useSched
 const { invoices, revalidate, mutate } = useUserInvoices()
 ```
 
-### Utility Functions
+### Subscription Utility Functions
 ```javascript
 import {
   getCurrentAddress,      // (type, addresses) => address object
@@ -377,6 +412,9 @@ import {
 } from "@limio/sdk"
 ```
 
+### Subscription References
+Use `subscription.reference` or `subscription.id` for linking between pages. Pass as URL query params (e.g. `?subRef=...` or `?subId=...`).
+
 ---
 
 ## Limio SDK - Pricing
@@ -386,6 +424,8 @@ import {
 import { useCheckout } from "@limio/sdk"
 
 const { useCheckoutSelector } = useCheckout({ redirectOnFailure: true })
+const checkoutState = useCheckoutSelector(state => state) || {}
+const { order, paidSchedule, schedule, locale } = checkoutState
 const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
 ```
 
@@ -400,13 +440,6 @@ const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
 import { usePreview } from "@limio/sdk"
 
 const { loadingPreview, isTaxPreviewCountry, taxCalculated } = usePreview()
-```
-
-### formatCurrencyForCurrentLocale
-```javascript
-import { formatCurrencyForCurrentLocale } from "@limio/sdk"
-
-formatCurrencyForCurrentLocale(9.99, "USD") // "$9.99"
 ```
 
 ---
@@ -429,7 +462,6 @@ When `isInPageBuilder` is true, the component is being rendered in the Limio Pag
 ```javascript
 const { isInPageBuilder } = useLimioContext() || {}
 
-// Conditional class for sticky header
 const headerClasses = [
     "header",
     isInPageBuilder ? "header--static" : ""
@@ -452,16 +484,91 @@ return <header className={headerClasses}>...</header>
 
 ---
 
-## HTML Sanitization
+## SDK Utilities
 
-Always sanitize HTML from Limio attributes:
+All imported from `@limio/sdk`:
 
+### HTML Sanitization
 ```javascript
-import xss from "xss"
+import { sanitiseHTML } from "@limio/sdk"
 
-const sanitizeString = (str) => xss(str || "")
+<div dangerouslySetInnerHTML={{ __html: sanitiseHTML(offer.data.attributes.offer_features__limio) }} />
+```
 
-<div dangerouslySetInnerHTML={{ __html: sanitizeString(offer.data.attributes.display_price__limio) }} />
+**Note:** `sanitiseHTML` uses DOMPurify and adds security attributes like `rel="noopener noreferrer"` to links. Prefer this over the `xss` npm package for rich text content. For Storybook compatibility (where `sanitiseHTML` may not be mocked), you can fall back to `xss` as a dependency.
+
+### Error Boundary
+```javascript
+import { ErrorBoundary } from "@limio/sdk"
+
+<ErrorBoundary ErrorUI={({ error }) => <p>Error: {error.message}</p>}>
+    <RiskyChild />
+</ErrorBoundary>
+```
+
+Also available as HOC: `withErrorBoundary(Component, ErrorUI)`
+
+### Date & Currency Formatting
+```javascript
+import { formatDate, formatCurrency, formatCurrencyForCurrentLocale } from "@limio/sdk"
+
+formatDate("2024-01-15T00:00:00Z", "DATE_FULL")   // "January 15, 2024"
+formatCurrency("20.00", "GBP")                      // "£20.00"
+formatCurrencyForCurrentLocale(20, "GBP")            // Locale-aware
+```
+
+`formatDate` formats: `"DATE_EN"`, `"DATE_FULL"`, `"DATE_SHORT"`, `"DATE_MED"`
+
+### Display Price Formatting
+```javascript
+import { formatDisplayPrice } from "@limio/sdk"
+
+formatDisplayPrice("{{currencySymbol}}{{amount}}/mo", offer.data.attributes.price__limio)
+```
+
+Placeholders: `{{currencyCode}}`, `{{currencySymbol}}`, `{{currencySymbolNative}}`, `{{amount}}`, `{{integerValue}}`, `{{decimalValue}}`, `{{formattedPrice}}`, `{{formattedPriceComma}}`
+
+### Offer Info Helper
+```javascript
+import { useOfferInfo } from "@limio/sdk"
+
+const info = useOfferInfo(offer)
+// { allowMultibuy, offerDescription, hasRecurringCharge, isDelivery, productNames, isAutoRenew, offerImage, usesExternalPrice, isGift, displayName }
+```
+
+### Active Offer Filtering
+```javascript
+import { checkActiveOffers } from "@limio/sdk"
+
+const activeOffers = checkActiveOffers(subscription.offers, false)
+// Filters by start/end dates, sorted by start date
+```
+
+### Address Utilities
+```javascript
+import { addressSummary, formatCountry, getAddressMetadata, getCountryMetadata } from "@limio/sdk"
+
+addressSummary(address)      // Formatted address string or "N/A"
+formatCountry("GB")          // "United Kingdom"
+getAddressMetadata("GB")     // { requiredAddressFields, addressFieldsToRender }
+getCountryMetadata("GB")     // { name, "alpha-2", "alpha-3", "country-code" }
+```
+
+### App Settings
+```javascript
+import { LimioAppSettings } from "@limio/sdk"
+const dateFormat = LimioAppSettings.getDateFormat()
+```
+
+### DateTime (Luxon)
+```javascript
+import { DateTime } from "@limio/sdk"
+```
+
+### Invoice Fetcher
+```javascript
+import { LimioFetchers } from "@limio/sdk"
+const blob = await LimioFetchers.invoiceFetch(path, token)
 ```
 
 ---
@@ -510,6 +617,40 @@ const getContrastColor = (hexColor) => {
     {ctaText}
 </button>
 ```
+
+---
+
+## CSS Patterns
+
+Use plain CSS with **CSS custom properties** for white-labelling. Map color limioProps to CSS variables via `style`:
+
+```javascript
+<div className="my-component" style={{ "--my-primary": primaryColor, "--my-danger": dangerColor }}>
+```
+
+```css
+.my-component {
+    --my-primary: #635BFF;
+    --my-text: #1a1f36;
+    --my-text-muted: #697386;
+    --my-border: #e3e8ee;
+    --my-bg: #f6f9fc;
+    --my-card: #ffffff;
+
+    background: var(--my-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--my-text);
+    -webkit-font-smoothing: antialiased;
+}
+```
+
+Key CSS patterns:
+- Prefix all classes with a short component abbreviation (e.g. `ad-`, `oc-`, `sp-`) to avoid collisions
+- Use `border: 1px solid var(--border)` + `border-radius: 10px` + subtle `box-shadow` for cards
+- 13px uppercase `letter-spacing: 0.06em` for section titles
+- `flex` with `justify-content: space-between` for detail rows
+- Always include `@media (max-width: 600px)` responsive breakpoint
+- Reset box-sizing: `.my-component *, .my-component *::before, .my-component *::after { box-sizing: border-box; }`
 
 ---
 
@@ -580,20 +721,24 @@ export default MyComponent
 
 ## Best Practices
 
-1. **Use public npm libraries** - Don't reinvent the wheel
-2. **Prefer SDKs** - Well-maintained libraries over custom code
-3. **Null safety** - Always use optional chaining and defaults
+1. **Use SDK utilities** — `sanitiseHTML`, `formatCurrency`, `formatDate`, `useOfferInfo`, `checkActiveOffers`, `groupOffers`, `getCurrentOffer`, `useSchedule`, `useSubInfo`, etc. Don't reimplement what the SDK provides.
+2. **Self-contained** — Do NOT import from `../source/utils/` or other internal paths. Use SDK utilities or inline helpers.
+3. **Null safety** — Always use optional chaining and defaults
    ```javascript
    const { offers } = useCampaign() || {}
    const attributes = offer?.data?.attributes || {}
    ```
-4. **List props** - Items are `{id, label}` objects
-5. **Picklist options** - Use `options` array with `{id, label, value}`
-6. **Page Builder compatibility** - Components with `position: fixed/absolute` must fall back to `position: relative` when `isInPageBuilder` is true, so they stay within their section
-7. **Loading states** - Handle `basketLoading` to prevent double submissions
-8. **Sanitize HTML** - Always use `xss` library for rich text content
-9. **MUI version** - Use 5.16.12 for React 19 compatibility
-10. **Always create stories** - Every component should have a Storybook story with variations
+4. **All text configurable** — Every heading, label, button text, and URL should be a `limioProp` so the component is fully white-label.
+5. **Color props** — Use color type limioProps for any configurable color. Pass through CSS custom properties.
+6. **List props** — Items are `{id, label}` objects
+7. **Picklist options** — Use `options` array with `{id, label, value}`
+8. **Page Builder compatibility** — Components with `position: fixed/absolute` must fall back to `position: relative` when `isInPageBuilder` is true
+9. **Loading states** — Handle `basketLoading` to prevent double submissions
+10. **Sanitize HTML** — Use `xss` library or `sanitiseHTML` from SDK for rich text content
+11. **MUI version** — Use 5.16.12 for React 19 compatibility
+12. **Always create stories** — Every component should have a Storybook story with variations
+13. **Subscription references** — Use `subscription.reference` or `subscription.id` for linking. Pass as URL query params (e.g. `?subRef=...`).
+14. **Subscription offers access** — Always use `subscription.offers[]` array to access offers. Do NOT use `subscription.data.offer` (legacy). A subscription can have multiple offers (standard + discount), so filter where `record_subtype` is NOT `"discount"` and check `start`/`end` dates to find the current active standard offer.
 
 ---
 
@@ -746,6 +891,8 @@ const mockOffers = [
                 group__limio: "monthly", best_value__limio: false,
                 offer_features__limio: "<ul><li>Unlimited access</li><li>Cancel anytime</li></ul>",
                 payment_types__limio: ["card"], checkout_description__limio: "Monthly subscription",
+                price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }],
+                term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" },
             },
             price: [{ value: 9.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
             products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
@@ -761,6 +908,8 @@ const mockOffers = [
                 group__limio: "annual", best_value__limio: true, badge_text__limio: "Best Value",
                 offer_features__limio: "<ul><li>Unlimited access</li><li>Priority support</li><li>Cancel anytime</li></ul>",
                 payment_types__limio: ["card", "paypal"], checkout_description__limio: "Annual subscription",
+                price__limio: [{ type: "recurring", value: 99.99, currencyCode: "USD" }],
+                term__limio: { type: "years", length: 1, renewal_trigger: "auto", renewal_type: "term" },
             },
             price: [{ value: 99.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "years" }],
             products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
@@ -776,6 +925,8 @@ const mockOffers = [
                 group__limio: "monthly", best_value__limio: false,
                 offer_features__limio: "<ul><li>Everything in Standard</li><li>Advanced analytics</li><li>API access</li><li>Dedicated support</li></ul>",
                 payment_types__limio: ["card", "paypal"], checkout_description__limio: "Premium monthly subscription",
+                price__limio: [{ type: "recurring", value: 19.99, currencyCode: "USD" }],
+                term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" },
             },
             price: [{ value: 19.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
             products: [{ path: "/products/premium", name: "Premium", attributes: { display_name__limio: "Premium Plan", product_code__limio: "PREMIUM" } }],
@@ -795,13 +946,73 @@ const mockBasketItems = [
 
 const mockUser = {
     username: "mock-user-001",
-    attributes: { email: "user@example.com", email_verified: true, sub: "mock-user-001" },
-    subscriptions: [{
-        name: "Monthly Plan", status: "active", record_type: "subscription",
-        id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z",
-        offers: [{ name: "Monthly Plan", quantity: 1, price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: [] }],
-        schedule: [{ data: { date: "2024-02-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Monthly Plan" }, status: "pending" }]
-    }],
+    attributes: { email: "alex@example.com", email_verified: true, firstName: "Alex", lastName: "Johnson", sub: "mock-user-001" },
+    subscriptions: [
+        {
+            name: "Pro Plan Monthly", status: "active", record_type: "subscription",
+            id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z", mode: "production",
+            offers: [{
+                name: "Pro Plan", quantity: 1,
+                data: {
+                    start: "2024-01-15T00:00:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Pro Plan", price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Pro Access", attributes: { display_name__limio: "Pro Access", product_code__limio: "STANDARD" } }]
+                        }
+                    }
+                },
+                price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: []
+            }],
+            schedule: [
+                { id: "sched-001", data: { date: "2024-01-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
+                { id: "sched-002", data: { date: "2024-02-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
+                { id: "sched-003", data: { date: "2027-07-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" }
+            ]
+        },
+        {
+            name: "Enterprise Annual", status: "active", record_type: "subscription",
+            id: "sub-002", reference: "REF002", created: "2024-03-15T09:30:00Z", mode: "production",
+            offers: [{
+                name: "Enterprise Plan", quantity: 1,
+                data: {
+                    start: "2024-03-15T09:30:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Enterprise Plan", price__limio: [{ type: "recurring", value: 499, currencyCode: "USD" }], term__limio: { type: "years", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Enterprise Access", attributes: { display_name__limio: "Enterprise Access", product_code__limio: "ENTERPRISE" } }]
+                        }
+                    }
+                },
+                price: { summary: { headline: "$499/year" }, currency: "USD", amount: 499 }, products: []
+            }],
+            schedule: [
+                { id: "sched-010", data: { date: "2024-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" },
+                { id: "sched-011", data: { date: "2027-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" }
+            ]
+        },
+        {
+            name: "Starter Monthly", status: "cancelled", record_type: "subscription",
+            id: "sub-003", reference: "REF003", created: "2023-06-01T08:00:00Z", mode: "production",
+            offers: [{
+                name: "Starter Plan", quantity: 1,
+                data: {
+                    start: "2023-06-01T08:00:00Z", end: "2023-12-01T08:00:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Starter Plan", price__limio: [{ type: "recurring", value: 4.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Starter Access", attributes: { display_name__limio: "Starter Access", product_code__limio: "STARTER" } }]
+                        }
+                    }
+                },
+                price: { summary: { headline: "$4.99/mo" }, currency: "USD", amount: 4.99 }, products: []
+            }],
+            schedule: [
+                { id: "sched-020", data: { date: "2023-06-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "active" },
+                { id: "sched-021", data: { date: "2023-11-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "cancelled" }
+            ]
+        }
+    ],
     loginStatus: "logged-in", loaded: true, token: "mock-jwt-token"
 }
 
@@ -862,7 +1073,7 @@ export function useComponentProps(defaultProps) {
 export function useCheckout() {
     return {
         useCheckoutSelector: (callback) => callback({
-            order: { orderDate: new Date().toISOString(), basketItems: mockBasketItems, orderItems: mockBasketItems, customerDetails: { firstName: "Test", lastName: "User", email: "user@example.com" } },
+            order: { orderDate: new Date().toISOString(), basketItems: mockBasketItems, orderItems: mockBasketItems, customerDetails: { firstName: "Alex", lastName: "Johnson", email: "alex@example.com" } },
             display: { orderTotal: { orderSubtotal: "$9.99", orderTotal: "$9.99", currency: "USD", taxSummary: [] } }
         })
     }
