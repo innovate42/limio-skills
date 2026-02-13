@@ -353,26 +353,32 @@ const { subscriptions } = useSubscriptions()
   created: "2024-01-15T...",
   record_type: "subscription",
   mode: "production",
-  offers: [                       // Related offers
+  offers: [                       // Array of offers — the documented access pattern
     {
       data: {
         start: "2024-01-15T...",
-        end: null,
-        record_subtype: "base",   // "base" | "discount"
+        end: null,                // null if still active
+        record_subtype: "base",   // "discount" = discount offer; anything else (or absent) = standard offer
         offer: {                  // Full offer object with data.attributes etc.
-          data: { attributes: { display_name__limio, price__limio, term__limio, ... }, products: [...] }
+          data: {
+            attributes: { display_name__limio, price__limio, term__limio, ... },
+            products: [{ name: "Product Name", attributes: { display_name__limio, product_code__limio } }]
+          }
         }
       }
     }
   ],
   schedule: [                    // Payment schedule
     {
+      id: "schedule-...",        // Unique ID — use as React key
       data: { date, amount, currency, description, type: "payment" },
       status: "active"           // "active" | "pending" | "pending-external" | "cancelled"
     }
   ]
 }
 ```
+
+**Important:** Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
 
 ### useSubInfo
 ```javascript
@@ -732,6 +738,7 @@ export default MyComponent
 11. **MUI version** — Use 5.16.12 for React 19 compatibility
 12. **Always create stories** — Every component should have a Storybook story with variations
 13. **Subscription references** — Use `subscription.reference` or `subscription.id` for linking. Pass as URL query params (e.g. `?subRef=...`).
+14. **Subscription offers access** — Always use `subscription.offers[]` array to access offers. Do NOT use `subscription.data.offer` (legacy). A subscription can have multiple offers (standard + discount), so filter where `record_subtype` is NOT `"discount"` and check `start`/`end` dates to find the current active standard offer.
 
 ---
 
@@ -940,35 +947,72 @@ const mockBasketItems = [
 const mockUser = {
     username: "mock-user-001",
     attributes: { email: "alex@example.com", email_verified: true, firstName: "Alex", lastName: "Johnson", sub: "mock-user-001" },
-    subscriptions: [{
-        name: "Pro Plan", status: "active", record_type: "subscription",
-        id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z",
-        data: {
-            offer: {
+    subscriptions: [
+        {
+            name: "Pro Plan Monthly", status: "active", record_type: "subscription",
+            id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z", mode: "production",
+            offers: [{
+                name: "Pro Plan", quantity: 1,
                 data: {
-                    attributes: { display_name__limio: "Pro Plan", price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
-                    products: [{ attributes: { product_code__limio: "STANDARD" } }]
-                }
-            }
-        },
-        offers: [{
-            name: "Pro Plan", quantity: 1,
-            data: {
-                start: "2024-01-15T00:00:00Z", record_subtype: "base",
-                offer: {
-                    data: {
-                        attributes: { display_name__limio: "Pro Plan", price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
-                        products: [{ attributes: { product_code__limio: "STANDARD" } }]
+                    start: "2024-01-15T00:00:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Pro Plan", price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Pro Access", attributes: { display_name__limio: "Pro Access", product_code__limio: "STANDARD" } }]
+                        }
                     }
-                }
-            },
-            price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: []
-        }],
-        schedule: [
-            { data: { date: "2024-01-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan" }, status: "active" },
-            { data: { date: "2027-07-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan" }, status: "active" }
-        ]
-    }],
+                },
+                price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: []
+            }],
+            schedule: [
+                { id: "sched-001", data: { date: "2024-01-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
+                { id: "sched-002", data: { date: "2024-02-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
+                { id: "sched-003", data: { date: "2027-07-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" }
+            ]
+        },
+        {
+            name: "Enterprise Annual", status: "active", record_type: "subscription",
+            id: "sub-002", reference: "REF002", created: "2024-03-15T09:30:00Z", mode: "production",
+            offers: [{
+                name: "Enterprise Plan", quantity: 1,
+                data: {
+                    start: "2024-03-15T09:30:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Enterprise Plan", price__limio: [{ type: "recurring", value: 499, currencyCode: "USD" }], term__limio: { type: "years", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Enterprise Access", attributes: { display_name__limio: "Enterprise Access", product_code__limio: "ENTERPRISE" } }]
+                        }
+                    }
+                },
+                price: { summary: { headline: "$499/year" }, currency: "USD", amount: 499 }, products: []
+            }],
+            schedule: [
+                { id: "sched-010", data: { date: "2024-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" },
+                { id: "sched-011", data: { date: "2027-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" }
+            ]
+        },
+        {
+            name: "Starter Monthly", status: "cancelled", record_type: "subscription",
+            id: "sub-003", reference: "REF003", created: "2023-06-01T08:00:00Z", mode: "production",
+            offers: [{
+                name: "Starter Plan", quantity: 1,
+                data: {
+                    start: "2023-06-01T08:00:00Z", end: "2023-12-01T08:00:00Z", record_subtype: "base",
+                    offer: {
+                        data: {
+                            attributes: { display_name__limio: "Starter Plan", price__limio: [{ type: "recurring", value: 4.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
+                            products: [{ name: "Starter Access", attributes: { display_name__limio: "Starter Access", product_code__limio: "STARTER" } }]
+                        }
+                    }
+                },
+                price: { summary: { headline: "$4.99/mo" }, currency: "USD", amount: 4.99 }, products: []
+            }],
+            schedule: [
+                { id: "sched-020", data: { date: "2023-06-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "active" },
+                { id: "sched-021", data: { date: "2023-11-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "cancelled" }
+            ]
+        }
+    ],
     loginStatus: "logged-in", loaded: true, token: "mock-jwt-token"
 }
 
