@@ -1,7 +1,7 @@
 ---
 name: limio-component
 description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 4.0.0
+version: 5.0.0
 ---
 
 # Limio Custom Component Creation
@@ -17,10 +17,14 @@ Use this skill when creating custom components for the Limio subscription manage
 1. **Create the component** in `./components/` (using the reference sections below)
 2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
 3. **If no Storybook exists:** Set up the playground (see "Storybook Setup" section)
-4. **Create a story** for the component with multiple variations
-5. **Install dependencies** if needed: `cd component-playground && npm install`
-6. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
-7. **Show the user** the running Storybook and ask for feedback
+4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
+5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
+6. **Create a story** for the component with multiple variations
+7. **Install dependencies** if needed: `cd component-playground && npm install`
+8. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
+9. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
+10. **Show the user** the running Storybook and mention the Claude Prompt panel
+11. **When prompt watcher exits** (prompt received), read `.prompt.json`, apply changes, then restart the watcher
 
 ## Component Location
 
@@ -752,7 +756,11 @@ If `component-playground/.storybook/main.js` does **not** exist, create the full
 component-playground/
 ├── .storybook/
 │   ├── main.js
-│   └── preview.js
+│   ├── preview.js
+│   ├── middleware.js
+│   └── addon-prompt/
+│       ├── manager.js
+│       └── preset.js
 ├── packages/
 │   └── limio/
 │       ├── sdk/
@@ -766,8 +774,11 @@ component-playground/
 │       │               └── basket.js
 │       └── internal-checkout-sdk/
 │           └── index.js
+├── scripts/
+│   └── watch-prompts.js
 ├── src/
 │   └── stories/
+├── .prompt.json          (transient — add to .gitignore)
 └── package.json
 ```
 
@@ -816,6 +827,7 @@ const config = {
         getAbsolutePath("@storybook/addon-webpack5-compiler-babel"),
         getAbsolutePath("@storybook/addon-essentials"),
         getAbsolutePath("@storybook/addon-interactions"),
+        path.resolve(__dirname, "addon-prompt"),
     ],
     framework: {
         name: getAbsolutePath("@storybook/react-webpack5"),
@@ -1129,6 +1141,289 @@ cd component-playground && npm install
 
 ---
 
+## Claude Prompt Addon (One-time)
+
+If `component-playground/.storybook/addon-prompt/manager.js` does **not** exist, create the Claude Prompt addon. This adds a panel to Storybook where users can type prompts that Claude Code picks up and processes automatically.
+
+### How it works
+
+1. User types a prompt in the Storybook "Claude Prompt" panel and clicks "Send to Claude"
+2. Storybook's Express middleware writes the prompt to `component-playground/.prompt.json`
+3. The watcher script (`scripts/watch-prompts.js`) detects the change and exits
+4. Claude Code gets notified, reads the prompt, applies changes to the component
+5. Storybook hot-reloads with the updated component
+
+### component-playground/.storybook/middleware.js
+
+```javascript
+const fs = require("fs")
+const path = require("path")
+
+const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
+
+module.exports = function expressMiddleware(app) {
+    app.use("/api/prompt", (req, res, next) => {
+        if (req.method === "POST") {
+            let body = ""
+            req.on("data", chunk => { body += chunk })
+            req.on("end", () => {
+                try { req.body = JSON.parse(body) } catch { req.body = {} }
+                next()
+            })
+        } else { next() }
+    })
+
+    app.post("/api/prompt", (req, res) => {
+        const { prompt, component, storyId } = req.body || {}
+        if (!prompt) return res.status(400).json({ error: "prompt is required" })
+        const data = { prompt, component: component || "unknown", storyId: storyId || "", timestamp: new Date().toISOString() }
+        try {
+            fs.writeFileSync(PROMPT_FILE, JSON.stringify(data, null, 2))
+            res.json({ success: true })
+        } catch (err) { res.status(500).json({ error: err.message }) }
+    })
+
+    app.get("/api/prompt", (req, res) => {
+        try {
+            if (fs.existsSync(PROMPT_FILE)) res.json(JSON.parse(fs.readFileSync(PROMPT_FILE, "utf8")))
+            else res.json({ prompt: "", component: "", storyId: "", timestamp: "" })
+        } catch { res.json({ prompt: "", component: "", storyId: "", timestamp: "" }) }
+    })
+}
+```
+
+### component-playground/.storybook/addon-prompt/preset.js
+
+```javascript
+module.exports = {
+    managerEntries(entry = []) {
+        return [...entry, require.resolve("./manager")]
+    },
+}
+```
+
+### component-playground/.storybook/addon-prompt/manager.js
+
+```javascript
+import React, { useState, useCallback, useEffect } from "react"
+import { addons, types, useStorybookApi } from "@storybook/manager-api"
+
+const ADDON_ID = "claude-prompt"
+const PANEL_ID = `${ADDON_ID}/panel`
+
+const styles = {
+    panel: { padding: "20px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', height: "100%", display: "flex", flexDirection: "column", background: "#f8f9fb" },
+    header: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" },
+    logo: { width: "28px", height: "28px", borderRadius: "8px", background: "linear-gradient(135deg, #d4a574 0%, #c4956a 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "14px", fontWeight: "700", flexShrink: 0 },
+    title: { fontSize: "15px", fontWeight: "700", color: "#1a1f36", margin: 0 },
+    componentBadge: { display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: "6px", background: "#eef0f6", fontSize: "12px", fontWeight: "600", color: "#697386", marginBottom: "12px", gap: "6px" },
+    componentName: { color: "#635BFF", fontFamily: '"SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace' },
+    textarea: { width: "100%", minHeight: "120px", padding: "12px", borderRadius: "8px", border: "1px solid #e3e8ee", fontFamily: "inherit", fontSize: "13px", lineHeight: "1.6", resize: "vertical", outline: "none", transition: "border-color 0.15s ease, box-shadow 0.15s ease", background: "#fff", color: "#1a1f36", flex: 1, boxSizing: "border-box" },
+    textareaFocused: { borderColor: "#635BFF", boxShadow: "0 0 0 3px rgba(99, 91, 255, 0.1)" },
+    footer: { display: "flex", alignItems: "center", gap: "10px", marginTop: "12px" },
+    button: { padding: "8px 20px", borderRadius: "8px", border: "none", background: "#635BFF", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: "pointer", transition: "opacity 0.15s ease, transform 0.1s ease", fontFamily: "inherit", whiteSpace: "nowrap" },
+    buttonDisabled: { opacity: 0.5, cursor: "not-allowed" },
+    status: { fontSize: "12px", color: "#697386", display: "flex", alignItems: "center", gap: "6px" },
+    statusDot: { width: "6px", height: "6px", borderRadius: "50%", display: "inline-block" },
+    hint: { fontSize: "11px", color: "#a3acb9", marginTop: "8px", lineHeight: "1.5" },
+    historySection: { marginTop: "16px", borderTop: "1px solid #e3e8ee", paddingTop: "12px" },
+    historyTitle: { fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", color: "#a3acb9", margin: "0 0 8px" },
+    historyItem: { fontSize: "12px", color: "#697386", padding: "6px 0", borderBottom: "1px solid #f0f2f5", lineHeight: "1.5" },
+    historyTime: { fontSize: "10px", color: "#a3acb9", marginLeft: "6px" },
+}
+
+const extractComponentFromStory = (story) => {
+    if (!story) return null
+    const importPath = story.importPath || ""
+    const match = importPath.match(/components\/([^/]+)\//)
+    if (match) return match[1]
+    if (story.title) return story.title.toLowerCase().replace(/\s+/g, "-")
+    return null
+}
+
+const STATUS_COLORS = { idle: "#a3acb9", sending: "#d97706", sent: "#0d9f6e", error: "#df1b41" }
+const STATUS_LABELS = { idle: "Ready", sending: "Sending...", sent: "Sent — waiting for Claude Code", error: "Failed to send" }
+
+const PromptPanel = () => {
+    const api = useStorybookApi()
+    const [prompt, setPrompt] = useState("")
+    const [status, setStatus] = useState("idle")
+    const [focused, setFocused] = useState(false)
+    const [history, setHistory] = useState([])
+    const [component, setComponent] = useState(null)
+
+    useEffect(() => { setComponent(extractComponentFromStory(api.getCurrentStoryData())) })
+
+    const handleSubmit = useCallback(async () => {
+        if (!prompt.trim() || status === "sending") return
+        setStatus("sending")
+        try {
+            const story = api.getCurrentStoryData()
+            const comp = extractComponentFromStory(story)
+            const res = await fetch("/api/prompt", {
+                method: "POST", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ prompt: prompt.trim(), component: comp || "unknown", storyId: story?.id || "" }),
+            })
+            if (res.ok) {
+                setStatus("sent")
+                setHistory(prev => [{ prompt: prompt.trim(), time: new Date().toLocaleTimeString(), component: comp }, ...prev.slice(0, 4)])
+                setPrompt("")
+                setTimeout(() => setStatus("idle"), 5000)
+            } else { setStatus("error"); setTimeout(() => setStatus("idle"), 3000) }
+        } catch { setStatus("error"); setTimeout(() => setStatus("idle"), 3000) }
+    }, [prompt, status, api])
+
+    const handleKeyDown = useCallback((e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); handleSubmit() }
+    }, [handleSubmit])
+
+    return (
+        <div style={styles.panel}>
+            <div style={styles.header}>
+                <div style={styles.logo}>C</div>
+                <h3 style={styles.title}>Claude Code Prompt</h3>
+            </div>
+            {component && (<div style={styles.componentBadge}><span>Component:</span><span style={styles.componentName}>{component}</span></div>)}
+            <textarea style={{ ...styles.textarea, ...(focused ? styles.textareaFocused : {}) }} value={prompt} onChange={(e) => setPrompt(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onKeyDown={handleKeyDown} placeholder="Describe changes you want Claude to make to this component..." disabled={status === "sending"} />
+            <div style={styles.footer}>
+                <button style={{ ...styles.button, ...(!prompt.trim() || status === "sending" ? styles.buttonDisabled : {}) }} onClick={handleSubmit} disabled={!prompt.trim() || status === "sending"}>Send to Claude</button>
+                <div style={styles.status}><span style={{ ...styles.statusDot, background: STATUS_COLORS[status] }} /><span>{STATUS_LABELS[status]}</span></div>
+            </div>
+            <div style={styles.hint}>Press <strong>Cmd+Enter</strong> to send. Claude Code will read this prompt and modify the component files. Storybook will hot-reload with the changes.</div>
+            {history.length > 0 && (
+                <div style={styles.historySection}>
+                    <h4 style={styles.historyTitle}>Recent prompts</h4>
+                    {history.map((item, i) => (<div key={i} style={styles.historyItem}>{item.prompt}<span style={styles.historyTime}>{item.time}</span></div>))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+addons.register(ADDON_ID, () => {
+    addons.add(PANEL_ID, { type: types.PANEL, title: "Claude Prompt", render: ({ active }) => (active ? <PromptPanel /> : null) })
+})
+```
+
+### component-playground/scripts/watch-prompts.js
+
+```javascript
+const fs = require("fs")
+const path = require("path")
+
+const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
+
+if (!fs.existsSync(PROMPT_FILE)) {
+    fs.writeFileSync(PROMPT_FILE, JSON.stringify({ prompt: "", component: "", storyId: "", timestamp: "" }, null, 2))
+}
+
+const initialContent = fs.readFileSync(PROMPT_FILE, "utf8")
+const initialTimestamp = JSON.parse(initialContent).timestamp || ""
+
+console.log("Watching for prompts from Storybook...")
+console.log(`Prompt file: ${PROMPT_FILE}`)
+
+const check = () => {
+    try {
+        const content = fs.readFileSync(PROMPT_FILE, "utf8")
+        const data = JSON.parse(content)
+        if (data.timestamp && data.timestamp !== initialTimestamp && data.prompt) {
+            console.log("\n===PROMPT_RECEIVED===")
+            console.log(JSON.stringify(data, null, 2))
+            console.log("===END_PROMPT===")
+            process.exit(0)
+        }
+    } catch {}
+}
+
+const interval = setInterval(check, 500)
+process.on("SIGINT", () => { clearInterval(interval); process.exit(0) })
+process.on("SIGTERM", () => { clearInterval(interval); process.exit(0) })
+```
+
+### Register the addon in main.js
+
+Add `path.resolve(__dirname, "addon-prompt")` to the `addons` array in `.storybook/main.js` (see the main.js template above which already includes it).
+
+### Add `.prompt.json` to `.gitignore`
+
+Append to `component-playground/.gitignore`:
+```
+.prompt.json
+```
+
+---
+
+## Prompt Watcher Workflow
+
+After starting Storybook, start the prompt watcher as a **background task**:
+
+```bash
+node component-playground/scripts/watch-prompts.js
+```
+
+When the watcher exits (a prompt was received from the Storybook panel):
+
+1. **Update status to "working":**
+   ```bash
+   node component-playground/scripts/update-prompt-status.js working "Reading component files..."
+   ```
+2. **Read the prompt file:** `component-playground/.prompt.json`
+3. **Parse the JSON** — it contains `{ prompt, component, storyId, timestamp }`
+4. **Read the target component files:** `components/<component>/index.js`, `index.css`, `package.json`
+5. **Update status as you work:**
+   ```bash
+   node component-playground/scripts/update-prompt-status.js working "Applying changes to <component>..."
+   ```
+6. **Apply the requested changes** to the component based on the prompt
+7. **Update status to "completed":**
+   ```bash
+   node component-playground/scripts/update-prompt-status.js completed "Changes applied — check Storybook"
+   ```
+8. **Restart the watcher** as a new background task to listen for the next prompt
+
+If you need user input or permission:
+```bash
+node component-playground/scripts/update-prompt-status.js permission_needed "Need approval to modify package.json dependencies"
+```
+
+If something goes wrong:
+```bash
+node component-playground/scripts/update-prompt-status.js error "Could not find component 'foo'"
+```
+
+### Status States
+
+| State | Shown as | Meaning |
+|-------|----------|---------|
+| `listening` | Green "Listening" badge | Watcher is running, ready for prompts |
+| `queued` | Yellow banner | Prompt saved, waiting for watcher to pick up |
+| `received` | Purple banner | Watcher picked up the prompt |
+| `working` | Purple banner + message | Claude Code is actively making changes |
+| `permission_needed` | Yellow banner | Claude Code needs user input |
+| `completed` | Green banner | Changes applied successfully |
+| `error` | Red banner | Something went wrong |
+
+### Status Update Script
+
+```bash
+node component-playground/scripts/update-prompt-status.js <state> <message>
+```
+
+The prompt file format:
+```json
+{
+    "prompt": "Make the hero section taller and change the gradient to blue-to-green",
+    "component": "win-back",
+    "storyId": "win-back--default",
+    "timestamp": "2025-01-15T10:30:00.000Z"
+}
+```
+
+**Important:** After processing a prompt, always update the status to "completed" and restart the watcher script so the next prompt can be captured.
+
+---
+
 ## Creating a Story
 
 After creating a component, **always** create a story file at `component-playground/src/stories/<ComponentName>.stories.js`.
@@ -1200,8 +1495,23 @@ After creating the component and its story:
 cd component-playground && npx storybook dev -p 6006
 ```
 
+Start this as a **background task** so it keeps running.
+
+Then start the **prompt watcher** as a second background task:
+
+```bash
+node component-playground/scripts/watch-prompts.js
+```
+
 **After starting Storybook, tell the user:**
 - Storybook is running at **http://localhost:6006**
 - List each story variation you created and what it demonstrates
-- Ask if they want any changes to the component or additional variations
-- Keep Storybook running while iterating on feedback
+- The **Claude Prompt** panel is available in the Storybook addons panel (bottom tabs) — they can type prompts there and Claude Code will automatically pick them up
+- Keep Storybook and the watcher running while iterating on feedback
+
+**When the watcher background task completes** (prompt received):
+1. Read `component-playground/.prompt.json` to get the prompt
+2. Read the target component's files (`components/<component>/index.js`, `index.css`, `package.json`)
+3. Apply the requested changes
+4. Restart the watcher as a new background task
+5. Tell the user the changes are applied and Storybook should hot-reload
