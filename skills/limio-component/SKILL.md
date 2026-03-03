@@ -1,6 +1,6 @@
 ---
 name: limio-component
-description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
+description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", "set up limio", "limio setup", "configure limio", "connect to limio", "launch storybook", "start storybook", "run storybook", "open storybook", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
 version: 5.0.0
 ---
 
@@ -25,6 +25,32 @@ Use this skill when creating custom components for the Limio subscription manage
 9. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
 10. **Show the user** the running Storybook and mention the Claude Prompt panel
 11. **When prompt watcher exits** (prompt received), read `.prompt.json`, apply changes, then restart the watcher
+
+## Limio Setup Workflow
+
+When the user asks to "set up Limio", "configure Limio", or "connect to Limio":
+
+1. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+2. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
+3. **Install dependencies:** `cd component-playground && npm install`
+4. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
+5. **Tell the user:** "Storybook is running at http://localhost:6006 — open **Tools > Limio Setup** in the sidebar to connect your Limio account."
+6. **Start the prompt watcher loop** (see "Start Storybook" section)
+
+This flow ensures that even a brand-new project with no Storybook gets everything bootstrapped in one command.
+
+## Launch Storybook Workflow
+
+When the user asks to "launch storybook", "start storybook", "run storybook", or "open storybook":
+
+1. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+2. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
+3. **Install dependencies if needed:** `cd component-playground && npm install`
+4. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
+5. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
+6. **Tell the user:** "Storybook is running at http://localhost:6006" and list any available stories
+
+This is the quick-launch path — it skips component creation and just starts the dev environment.
 
 ## Component Location
 
@@ -778,7 +804,9 @@ component-playground/
 │   └── watch-prompts.js
 ├── src/
 │   └── stories/
+│       └── LimioSetup.stories.js
 ├── .prompt.json          (transient — add to .gitignore)
+├── .prompt-status.json   (transient — add to .gitignore)
 └── package.json
 ```
 
@@ -1158,36 +1186,257 @@ If `component-playground/.storybook/addon-prompt/manager.js` does **not** exist,
 ```javascript
 const fs = require("fs")
 const path = require("path")
+const { execSync } = require("child_process")
 
 const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
+const STATUS_FILE = path.resolve(__dirname, "..", ".prompt-status.json")
+const PROJECT_ROOT = path.resolve(__dirname, "..", "..")
+const CONFIG_FILE = path.join(PROJECT_ROOT, ".limio.json")
+
+// --- Limio config + token management ---
+
+function readLimioConfig() {
+    try {
+        if (!fs.existsSync(CONFIG_FILE)) return null
+        const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"))
+        if (!raw.tenant || !raw.clientId || !raw.clientSecret) return null
+        return raw
+    } catch {
+        return null
+    }
+}
+
+function getLimioBaseUrl(config) {
+    const region = (config.region || "eu").toLowerCase()
+    if (region === "us") return `https://${config.tenant}.prod-us.limio.com`
+    if (region === "dev") return `https://${config.tenant}.dev.limio.com`
+    return `https://${config.tenant}.prod.limio.com`
+}
+
+let tokenCache = { token: null, expiresAt: 0 }
+
+async function getAccessToken(config) {
+    const now = Date.now()
+    if (tokenCache.token && tokenCache.expiresAt > now + 60000) {
+        return tokenCache.token
+    }
+    const baseUrl = getLimioBaseUrl(config)
+    const res = await fetch(`${baseUrl}/auth/token`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            grant_type: "client_credentials",
+            client_id: config.clientId,
+            client_secret: config.clientSecret,
+        }),
+    })
+    if (!res.ok) {
+        const text = await res.text().catch(() => "")
+        throw new Error(`Auth failed (${res.status}): ${text}`)
+    }
+    const data = await res.json()
+    tokenCache = {
+        token: data.access_token,
+        expiresAt: now + (data.expires_in || 3600) * 1000,
+    }
+    return tokenCache.token
+}
+
+// --- Helpers ---
+
+function readBody(req) {
+    return new Promise((resolve) => {
+        let body = ""
+        req.on("data", chunk => { body += chunk })
+        req.on("end", () => {
+            try { resolve(JSON.parse(body)) } catch { resolve({}) }
+        })
+    })
+}
+
+function sendJson(res, statusCode, data) {
+    res.statusCode = statusCode
+    res.setHeader("Content-Type", "application/json")
+    res.end(JSON.stringify(data))
+}
 
 module.exports = function expressMiddleware(app) {
-    app.use("/api/prompt", (req, res, next) => {
+    // Auto-reset stale prompt status from interrupted sessions
+    try {
+        if (fs.existsSync(STATUS_FILE)) {
+            const status = JSON.parse(fs.readFileSync(STATUS_FILE, "utf8"))
+            if (["queued", "received", "working"].includes(status.state)) {
+                fs.writeFileSync(STATUS_FILE, JSON.stringify(
+                    { state: "listening", message: "", timestamp: new Date().toISOString() }, null, 2
+                ))
+            }
+        }
+    } catch {}
+
+    app.use("/api/prompt", async (req, res, next) => {
         if (req.method === "POST") {
-            let body = ""
-            req.on("data", chunk => { body += chunk })
-            req.on("end", () => {
-                try { req.body = JSON.parse(body) } catch { req.body = {} }
-                next()
+            const body = await readBody(req)
+            const { prompt, component, storyId, mode } = body
+            if (!prompt) return sendJson(res, 400, { error: "prompt is required" })
+            const data = { prompt, component: component || "unknown", storyId: storyId || "", mode: mode || "edit", timestamp: new Date().toISOString() }
+            try {
+                fs.writeFileSync(PROMPT_FILE, JSON.stringify(data, null, 2))
+                const statusData = { state: "queued", message: "Prompt sent — waiting for Claude Code...", timestamp: new Date().toISOString() }
+                fs.writeFileSync(STATUS_FILE, JSON.stringify(statusData, null, 2))
+                sendJson(res, 200, { success: true })
+            } catch (err) {
+                console.error("Error writing prompt:", err)
+                sendJson(res, 500, { error: err.message })
+            }
+        } else if (req.method === "GET") {
+            try {
+                if (fs.existsSync(PROMPT_FILE)) {
+                    sendJson(res, 200, JSON.parse(fs.readFileSync(PROMPT_FILE, "utf8")))
+                } else {
+                    sendJson(res, 200, { prompt: "", component: "", storyId: "", timestamp: "" })
+                }
+            } catch { sendJson(res, 200, { prompt: "", component: "", storyId: "", timestamp: "" }) }
+        } else {
+            next()
+        }
+    })
+
+    app.use("/api/prompt-status", async (req, res, next) => {
+        if (req.method === "POST") {
+            const body = await readBody(req)
+            const { state, message } = body
+            if (!state) return sendJson(res, 400, { error: "state is required" })
+            try {
+                const data = { state, message: message || "", timestamp: new Date().toISOString() }
+                fs.writeFileSync(STATUS_FILE, JSON.stringify(data, null, 2))
+                sendJson(res, 200, { success: true })
+            } catch (err) {
+                sendJson(res, 500, { error: err.message })
+            }
+        } else if (req.method === "GET") {
+            try {
+                if (fs.existsSync(STATUS_FILE)) {
+                    sendJson(res, 200, JSON.parse(fs.readFileSync(STATUS_FILE, "utf8")))
+                } else {
+                    sendJson(res, 200, { state: "listening", message: "" })
+                }
+            } catch { sendJson(res, 200, { state: "listening", message: "" }) }
+        } else {
+            next()
+        }
+    })
+
+    app.use("/api/deploy", async (req, res, next) => {
+        if (req.method === "POST") {
+            const body = await readBody(req)
+            const { component } = body
+            if (!component) return sendJson(res, 400, { error: "component is required" })
+            try {
+                const componentDir = path.join("components", component)
+                const componentPath = path.join(PROJECT_ROOT, componentDir)
+                if (!fs.existsSync(componentPath)) return sendJson(res, 400, { error: `Component folder not found: ${componentDir}` })
+                execSync(`git add ${componentDir}/`, { cwd: PROJECT_ROOT })
+                const storiesDir = path.join(PROJECT_ROOT, "component-playground", "src", "stories")
+                if (fs.existsSync(storiesDir)) {
+                    const storyFiles = fs.readdirSync(storiesDir).filter(f => f.endsWith(".stories.js") || f.endsWith(".stories.jsx"))
+                    for (const file of storyFiles) {
+                        const content = fs.readFileSync(path.join(storiesDir, file), "utf8")
+                        if (content.includes(component)) {
+                            execSync(`git add component-playground/src/stories/${file}`, { cwd: PROJECT_ROOT })
+                        }
+                    }
+                }
+                execSync(`git commit -m "Deploy component: ${component}"`, { cwd: PROJECT_ROOT })
+                const commitHash = execSync("git rev-parse HEAD", { cwd: PROJECT_ROOT }).toString().trim()
+                execSync("git push", { cwd: PROJECT_ROOT })
+                sendJson(res, 200, { success: true, message: `Deployed ${component} successfully`, commitHash })
+            } catch (err) {
+                console.error("Deploy error:", err.message)
+                sendJson(res, 500, { error: err.message })
+            }
+        } else if (req.method === "GET") {
+            try {
+                const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: PROJECT_ROOT }).toString().trim()
+                const status = execSync("git status --porcelain", { cwd: PROJECT_ROOT }).toString().trim()
+                sendJson(res, 200, { branch, clean: status.length === 0, status })
+            } catch (err) {
+                sendJson(res, 500, { error: err.message })
+            }
+        } else {
+            next()
+        }
+    })
+
+    // --- Limio connection status ---
+    app.use("/api/limio/status", async (req, res, next) => {
+        if (req.method !== "GET") return next()
+        const config = readLimioConfig()
+        if (!config) return sendJson(res, 200, { configured: false })
+        try {
+            await getAccessToken(config)
+            sendJson(res, 200, { configured: true, tenant: config.tenant, region: config.region || "eu", baseUrl: getLimioBaseUrl(config) })
+        } catch (err) {
+            sendJson(res, 200, { configured: false, error: `Credentials invalid: ${err.message}` })
+        }
+    })
+
+    // --- Save Limio credentials ---
+    app.use("/api/limio/setup", async (req, res, next) => {
+        if (req.method !== "POST") return next()
+        const body = await readBody(req)
+        const { tenant, region, clientId, clientSecret } = body
+        if (!tenant || !clientId || !clientSecret) {
+            return sendJson(res, 400, { error: "tenant, clientId, and clientSecret are required" })
+        }
+        const config = { tenant, region: region || "eu", clientId, clientSecret }
+        try {
+            tokenCache = { token: null, expiresAt: 0 }
+            await getAccessToken(config)
+        } catch (err) {
+            return sendJson(res, 400, { error: `Authentication failed: ${err.message}` })
+        }
+        try {
+            fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
+            sendJson(res, 200, { success: true, tenant, region: config.region, baseUrl: getLimioBaseUrl(config) })
+        } catch (err) {
+            sendJson(res, 500, { error: `Failed to save config: ${err.message}` })
+        }
+    })
+
+    // --- Build status proxy ---
+    app.use("/api/build-status", async (req, res, next) => {
+        if (req.method !== "GET") return next()
+        const url = new URL(req.url, "http://localhost")
+        const commitHash = url.searchParams.get("commitHash")
+        if (!commitHash) return sendJson(res, 400, { error: "commitHash is required" })
+        const config = readLimioConfig()
+        if (!config) return sendJson(res, 400, { error: "Limio not configured" })
+        try {
+            const token = await getAccessToken(config)
+            const baseUrl = getLimioBaseUrl(config)
+            const apiRes = await fetch(`${baseUrl}/api/component/builds?commitHash=${encodeURIComponent(commitHash)}`, {
+                headers: { Authorization: `Bearer ${token}` },
             })
-        } else { next() }
-    })
-
-    app.post("/api/prompt", (req, res) => {
-        const { prompt, component, storyId } = req.body || {}
-        if (!prompt) return res.status(400).json({ error: "prompt is required" })
-        const data = { prompt, component: component || "unknown", storyId: storyId || "", timestamp: new Date().toISOString() }
-        try {
-            fs.writeFileSync(PROMPT_FILE, JSON.stringify(data, null, 2))
-            res.json({ success: true })
-        } catch (err) { res.status(500).json({ error: err.message }) }
-    })
-
-    app.get("/api/prompt", (req, res) => {
-        try {
-            if (fs.existsSync(PROMPT_FILE)) res.json(JSON.parse(fs.readFileSync(PROMPT_FILE, "utf8")))
-            else res.json({ prompt: "", component: "", storyId: "", timestamp: "" })
-        } catch { res.json({ prompt: "", component: "", storyId: "", timestamp: "" }) }
+            if (!apiRes.ok) {
+                const text = await apiRes.text().catch(() => "")
+                return sendJson(res, apiRes.status, { found: false, error: `Limio API error (${apiRes.status}): ${text}` })
+            }
+            const data = await apiRes.json()
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                return sendJson(res, 200, { found: false })
+            }
+            const build = Array.isArray(data) ? data[0] : data
+            sendJson(res, 200, {
+                found: true,
+                buildStatus: build.status || build.buildStatus || "UNKNOWN",
+                buildComplete: ["SUCCEEDED", "FAILED", "ERROR"].includes((build.status || build.buildStatus || "").toUpperCase()),
+                logErrors: build.logErrors || build.errors || null,
+                startTime: build.startTime || build.createdAt || null,
+                endTime: build.endTime || build.completedAt || null,
+            })
+        } catch (err) {
+            sendJson(res, 500, { error: err.message })
+        }
     })
 }
 ```
@@ -1204,106 +1453,25 @@ module.exports = {
 
 ### component-playground/.storybook/addon-prompt/manager.js
 
-```javascript
-import React, { useState, useCallback, useEffect } from "react"
-import { addons, types, useStorybookApi } from "@storybook/manager-api"
+The manager.js file registers two panels: **Claude Prompt** (for sending prompts) and **Limio Settings** (for configuring Limio credentials). It includes real-time backend status polling, deploy functionality with Limio build tracking, and the Limio connection settings form.
 
-const ADDON_ID = "claude-prompt"
-const PANEL_ID = `${ADDON_ID}/panel`
+The full file is extensive (~540 lines). Key features to include when creating it:
 
-const styles = {
-    panel: { padding: "20px", fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif', height: "100%", display: "flex", flexDirection: "column", background: "#f8f9fb" },
-    header: { display: "flex", alignItems: "center", gap: "10px", marginBottom: "16px" },
-    logo: { width: "28px", height: "28px", borderRadius: "8px", background: "linear-gradient(135deg, #d4a574 0%, #c4956a 100%)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: "14px", fontWeight: "700", flexShrink: 0 },
-    title: { fontSize: "15px", fontWeight: "700", color: "#1a1f36", margin: 0 },
-    componentBadge: { display: "inline-flex", alignItems: "center", padding: "4px 10px", borderRadius: "6px", background: "#eef0f6", fontSize: "12px", fontWeight: "600", color: "#697386", marginBottom: "12px", gap: "6px" },
-    componentName: { color: "#635BFF", fontFamily: '"SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace' },
-    textarea: { width: "100%", minHeight: "120px", padding: "12px", borderRadius: "8px", border: "1px solid #e3e8ee", fontFamily: "inherit", fontSize: "13px", lineHeight: "1.6", resize: "vertical", outline: "none", transition: "border-color 0.15s ease, box-shadow 0.15s ease", background: "#fff", color: "#1a1f36", flex: 1, boxSizing: "border-box" },
-    textareaFocused: { borderColor: "#635BFF", boxShadow: "0 0 0 3px rgba(99, 91, 255, 0.1)" },
-    footer: { display: "flex", alignItems: "center", gap: "10px", marginTop: "12px" },
-    button: { padding: "8px 20px", borderRadius: "8px", border: "none", background: "#635BFF", color: "#fff", fontSize: "13px", fontWeight: "600", cursor: "pointer", transition: "opacity 0.15s ease, transform 0.1s ease", fontFamily: "inherit", whiteSpace: "nowrap" },
-    buttonDisabled: { opacity: 0.5, cursor: "not-allowed" },
-    status: { fontSize: "12px", color: "#697386", display: "flex", alignItems: "center", gap: "6px" },
-    statusDot: { width: "6px", height: "6px", borderRadius: "50%", display: "inline-block" },
-    hint: { fontSize: "11px", color: "#a3acb9", marginTop: "8px", lineHeight: "1.5" },
-    historySection: { marginTop: "16px", borderTop: "1px solid #e3e8ee", paddingTop: "12px" },
-    historyTitle: { fontSize: "11px", fontWeight: "600", textTransform: "uppercase", letterSpacing: "0.06em", color: "#a3acb9", margin: "0 0 8px" },
-    historyItem: { fontSize: "12px", color: "#697386", padding: "6px 0", borderBottom: "1px solid #f0f2f5", lineHeight: "1.5" },
-    historyTime: { fontSize: "10px", color: "#a3acb9", marginLeft: "6px" },
-}
+- **PromptPanel** — textarea + send button, real-time backend status polling (`/api/prompt-status`), deploy button with build status tracking, `+ New` button to navigate to new-component story
+- **SettingsPanel** — Limio credential form with tenant, region (EU/US/Dev), client ID, client secret; URL preview that shows the correct domain per region; connects via `/api/limio/setup`
+- **Region dropdown** must include all three options:
+  ```jsx
+  <option value="eu">EU (Europe)</option>
+  <option value="us">US (United States)</option>
+  <option value="dev">Dev (Development)</option>
+  ```
+- **URL preview** must handle all three regions:
+  ```jsx
+  {region === "us" ? `${tenant}.prod-us.limio.com` : region === "dev" ? `${tenant}.dev.limio.com` : `${tenant}.prod.limio.com`}
+  ```
+- **Registration:** `addons.register` with both `PANEL_ID` (Claude Prompt) and `SETTINGS_PANEL_ID` (Limio Settings)
 
-const extractComponentFromStory = (story) => {
-    if (!story) return null
-    const importPath = story.importPath || ""
-    const match = importPath.match(/components\/([^/]+)\//)
-    if (match) return match[1]
-    if (story.title) return story.title.toLowerCase().replace(/\s+/g, "-")
-    return null
-}
-
-const STATUS_COLORS = { idle: "#a3acb9", sending: "#d97706", sent: "#0d9f6e", error: "#df1b41" }
-const STATUS_LABELS = { idle: "Ready", sending: "Sending...", sent: "Sent — waiting for Claude Code", error: "Failed to send" }
-
-const PromptPanel = () => {
-    const api = useStorybookApi()
-    const [prompt, setPrompt] = useState("")
-    const [status, setStatus] = useState("idle")
-    const [focused, setFocused] = useState(false)
-    const [history, setHistory] = useState([])
-    const [component, setComponent] = useState(null)
-
-    useEffect(() => { setComponent(extractComponentFromStory(api.getCurrentStoryData())) })
-
-    const handleSubmit = useCallback(async () => {
-        if (!prompt.trim() || status === "sending") return
-        setStatus("sending")
-        try {
-            const story = api.getCurrentStoryData()
-            const comp = extractComponentFromStory(story)
-            const res = await fetch("/api/prompt", {
-                method: "POST", headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ prompt: prompt.trim(), component: comp || "unknown", storyId: story?.id || "" }),
-            })
-            if (res.ok) {
-                setStatus("sent")
-                setHistory(prev => [{ prompt: prompt.trim(), time: new Date().toLocaleTimeString(), component: comp }, ...prev.slice(0, 4)])
-                setPrompt("")
-                setTimeout(() => setStatus("idle"), 5000)
-            } else { setStatus("error"); setTimeout(() => setStatus("idle"), 3000) }
-        } catch { setStatus("error"); setTimeout(() => setStatus("idle"), 3000) }
-    }, [prompt, status, api])
-
-    const handleKeyDown = useCallback((e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); handleSubmit() }
-    }, [handleSubmit])
-
-    return (
-        <div style={styles.panel}>
-            <div style={styles.header}>
-                <div style={styles.logo}>C</div>
-                <h3 style={styles.title}>Claude Code Prompt</h3>
-            </div>
-            {component && (<div style={styles.componentBadge}><span>Component:</span><span style={styles.componentName}>{component}</span></div>)}
-            <textarea style={{ ...styles.textarea, ...(focused ? styles.textareaFocused : {}) }} value={prompt} onChange={(e) => setPrompt(e.target.value)} onFocus={() => setFocused(true)} onBlur={() => setFocused(false)} onKeyDown={handleKeyDown} placeholder="Describe changes you want Claude to make to this component..." disabled={status === "sending"} />
-            <div style={styles.footer}>
-                <button style={{ ...styles.button, ...(!prompt.trim() || status === "sending" ? styles.buttonDisabled : {}) }} onClick={handleSubmit} disabled={!prompt.trim() || status === "sending"}>Send to Claude</button>
-                <div style={styles.status}><span style={{ ...styles.statusDot, background: STATUS_COLORS[status] }} /><span>{STATUS_LABELS[status]}</span></div>
-            </div>
-            <div style={styles.hint}>Press <strong>Cmd+Enter</strong> to send. Claude Code will read this prompt and modify the component files. Storybook will hot-reload with the changes.</div>
-            {history.length > 0 && (
-                <div style={styles.historySection}>
-                    <h4 style={styles.historyTitle}>Recent prompts</h4>
-                    {history.map((item, i) => (<div key={i} style={styles.historyItem}>{item.prompt}<span style={styles.historyTime}>{item.time}</span></div>))}
-                </div>
-            )}
-        </div>
-    )
-}
-
-addons.register(ADDON_ID, () => {
-    addons.add(PANEL_ID, { type: types.PANEL, title: "Claude Prompt", render: ({ active }) => (active ? <PromptPanel /> : null) })
-})
-```
+Use the actual file at `component-playground/.storybook/addon-prompt/manager.js` as the source of truth — it evolves faster than this template.
 
 ### component-playground/scripts/watch-prompts.js
 
@@ -1350,6 +1518,7 @@ Add `path.resolve(__dirname, "addon-prompt")` to the `addons` array in `.storybo
 Append to `component-playground/.gitignore`:
 ```
 .prompt.json
+.prompt-status.json
 ```
 
 ---
@@ -1421,6 +1590,21 @@ The prompt file format:
 ```
 
 **Important:** After processing a prompt, always update the status to "completed" and restart the watcher script so the next prompt can be captured.
+
+---
+
+## Limio Setup Story (One-time)
+
+If `component-playground/src/stories/LimioSetup.stories.js` does **not** exist, create it. This provides a guided onboarding wizard at **Tools > Limio Setup** in the Storybook sidebar.
+
+The wizard has three steps:
+1. **Welcome** — branded header + "Get Started" button
+2. **Enter Credentials** — form with tenant, region (EU/US/Dev), client ID, client secret; live URL preview; POSTs to `/api/limio/setup`
+3. **Connected** — success confirmation with "Build a Component" and "Browse Components" action buttons
+
+On mount it auto-detects existing config via `GET /api/limio/status` and skips to Step 3 if already configured.
+
+Use the actual file at `component-playground/src/stories/LimioSetup.stories.js` as the source of truth.
 
 ---
 
@@ -1507,6 +1691,7 @@ node component-playground/scripts/watch-prompts.js
 - Storybook is running at **http://localhost:6006**
 - List each story variation you created and what it demonstrates
 - The **Claude Prompt** panel is available in the Storybook addons panel (bottom tabs) — they can type prompts there and Claude Code will automatically pick them up
+- If Limio is not yet configured, mention: "Open **Tools > Limio Setup** in the sidebar to connect your Limio account"
 - Keep Storybook and the watcher running while iterating on feedback
 
 **When the watcher background task completes** (prompt received):
