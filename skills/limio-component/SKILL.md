@@ -247,7 +247,19 @@ const { offers, campaign, addOns, tag, groupValues } = useCampaign()
 - `offers` - Array of subscription products
 - `addOns` - Array of optional products/upsells
 - `tag` - Entry tracking tag (e.g., "/tags/dummytag")
-- `groupValues` - Array of `{ label, id }` for offer categorization
+- `groupValues` - Array of `{ label, id }` for offer categorization. **WARNING:** This returns ALL possible group values configured in the system, not just the groups present on the current page's offers. Always filter `groupValues` against the actual offers' `group__limio` attributes before rendering a toggle, otherwise irrelevant groups will appear.
+
+**Filtering groupValues to match page offers:**
+```javascript
+const { offers = [], groupValues = [] } = useCampaign() || {}
+
+// Derive active groups from actual offers, not all system groupValues
+const offerGroupIds = [...new Set(
+  offers.map((o) => o?.data?.attributes?.group__limio).filter(Boolean)
+)]
+const activeGroups = groupValues.filter((g) => offerGroupIds.includes(g.id))
+// Use activeGroups (not groupValues) for toggle rendering and filtering
+```
 
 ### groupOffers Utility
 ```javascript
