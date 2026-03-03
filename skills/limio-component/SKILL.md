@@ -1262,6 +1262,12 @@ import * as React from "react"
 const LimioContext = React.createContext({})
 export const ComponentContext = React.createContext({})
 
+// ===== Mutable Config (allows Storybook stories to override mock data) =====
+export const __mockConfig = {
+    offersOverride: null,     // Set to an array of offers to override default mockOffers
+    groupValuesOverride: null // Set to an array of { label, id } to override default groupValues
+}
+
 // ===== Mock Data =====
 
 const mockOffers = [
@@ -1416,8 +1422,14 @@ const dummyContext = {
 
 export function useCampaign() {
     React.useContext(LimioContext)
-    const { campaign, offers, addOns } = dummyContext.shop
-    return { campaign, offers, addOns }
+    const { campaign, offers, addOns, tag } = dummyContext.shop
+    const resolvedOffers = __mockConfig.offersOverride || offers
+    // Derive groupValues from offers if no override is provided
+    const defaultGroupValues = [...new Set(
+        resolvedOffers.map(o => o?.data?.attributes?.group__limio).filter(Boolean)
+    )].map(id => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) }))
+    const groupValues = __mockConfig.groupValuesOverride || defaultGroupValues
+    return { campaign, offers: resolvedOffers, addOns, tag, groupValues }
 }
 
 export function useBasket() {
@@ -2437,6 +2449,30 @@ export const MinimalContent = {
     }
 }
 ```
+
+### Overriding Mock Offers in Stories
+
+Use `__mockConfig` from the SDK mock to override offers or groupValues per story. This lets you test different offer sets (e.g., fewer cards, different groups) without changing the global mock.
+
+```javascript
+import { __mockConfig } from "@limio/sdk"
+
+export const TwoCards = {
+    args: { ...Default.args },
+    decorators: [
+        (Story) => {
+            __mockConfig.offersOverride = [/* custom offers array */]
+            __mockConfig.groupValuesOverride = [
+                { label: "Monthly", id: "monthly" },
+                { label: "Annual", id: "annual" },
+            ]
+            return <Story />
+        }
+    ]
+}
+```
+
+Reset overrides when they should only apply to a specific story — other stories will use the default `mockOffers` when `offersOverride` is `null`.
 
 ### Story Creation Rules
 
