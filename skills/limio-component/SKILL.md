@@ -1420,15 +1420,22 @@ const dummyContext = {
 
 // ===== Hooks =====
 
+// System-wide group values — intentionally includes groups NOT present in mockOffers
+// to simulate real SDK behavior where groupValues returns ALL configured groups.
+// Components MUST filter these against actual offers' group__limio attributes.
+const allSystemGroupValues = [
+    { label: "Monthly", id: "monthly" },
+    { label: "Annual", id: "annual" },
+    { label: "Quarterly", id: "quarterly" },
+    { label: "2-Years Plan", id: "2-years" },
+    { label: "Consultations", id: "consultations" },
+]
+
 export function useCampaign() {
     React.useContext(LimioContext)
     const { campaign, offers, addOns, tag } = dummyContext.shop
     const resolvedOffers = __mockConfig.offersOverride || offers
-    // Derive groupValues from offers if no override is provided
-    const defaultGroupValues = [...new Set(
-        resolvedOffers.map(o => o?.data?.attributes?.group__limio).filter(Boolean)
-    )].map(id => ({ id, label: id.charAt(0).toUpperCase() + id.slice(1) }))
-    const groupValues = __mockConfig.groupValuesOverride || defaultGroupValues
+    const groupValues = __mockConfig.groupValuesOverride || allSystemGroupValues
     return { campaign, offers: resolvedOffers, addOns, tag, groupValues }
 }
 
