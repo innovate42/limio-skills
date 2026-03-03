@@ -1,7 +1,7 @@
 ---
 name: limio-component
 description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", "set up limio", "limio setup", "configure limio", "connect to limio", "launch storybook", "start storybook", "run storybook", "open storybook", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 5.2.0
+version: 7.0.0
 ---
 
 # Limio Custom Component Creation
@@ -10,14 +10,16 @@ Use this skill when creating custom components for the Limio subscription manage
 
 **IMPORTANT:** This skill contains all the documentation you need for building components. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly. The one exception is checking whether Storybook is already set up (see Storybook section).
 
+**CRITICAL — Credential Safety:** `.limio.json` contains OAuth client credentials (client ID + client secret). It MUST be in `.gitignore` and MUST NEVER be committed to git. When committing or staging files, NEVER include `.limio.json`. If you see it in `git status` as untracked or modified, verify it is gitignored before proceeding. When creating a new project, always add `.limio.json` to the **root** `.gitignore`.
+
 **Official SDK docs:** https://docs.limio.com/developers/limio-sdk
 
 ## Skill Version Check
 
-**Current version: 5.2.0** — Before running any workflow, verify the skill is up to date:
+**Current version: 7.0.0** — Before running any workflow, verify the skill is up to date:
 
-1. Read the first 5 lines of this skill file and check for `version: 5.2.0`
-2. If the version is missing or lower than `5.2.0`, the skill cache is stale. Copy the latest from the source repo:
+1. Read the first 5 lines of this skill file and check for `version: 7.0.0`
+2. If the version is missing or lower than `6.0.0`, the skill cache is stale. Copy the latest from the source repo:
    ```bash
    cp /Users/benny/dev/limio-skills/skills/limio-component/SKILL.md /Users/benny/.claude/skills/limio-component/SKILL.md
    ```
@@ -27,42 +29,47 @@ Use this skill when creating custom components for the Limio subscription manage
    - `/api/deploy` (in the middleware.js template)
    - `Skill Version Check` (this section)
    - `ClaudeOverlay` (in the preview.js / claude-overlay.js template)
+   - `DeployOverlay` (in the claude-overlay.js template)
    - `NewComponent` (in the NewComponent.stories.js template)
+   - `Credential Safety` (near top of skill)
+   - `smart-deploy` (in the middleware.js deploy endpoint)
 
 If the skill was updated, re-read it before continuing.
 
 ## Full Workflow
 
-1. **Create the component** in `./components/` (using the reference sections below)
-2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-3. **If no Storybook exists:** Set up the playground (see "Storybook Setup" section)
-4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-6. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `/api/deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-7. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it (see "Claude Overlay" section) and update `preview.js` to import and render it
-8. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it (see "New Component Builder" section)
-9. **Create a story** for the component with multiple variations
-10. **Install dependencies** if needed: `cd component-playground && npm install`
-11. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
-12. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
-13. **Show the user** the running Storybook and mention the Claude Prompt panel
-14. **When prompt watcher exits** (prompt received), read `.prompt.json`, apply changes, then restart the watcher
+1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
+2. **Create the component** in `./components/` (using the reference sections below)
+3. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+4. **If no Storybook exists:** Set up the playground (see "Storybook Setup" section)
+5. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
+6. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
+7. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
+8. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it (see "Claude Overlay" section) and update `preview.js` to import and render it
+9. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it (see "New Component Builder" section)
+10. **Create a story** for the component with multiple variations
+11. **Install dependencies** if needed: `cd component-playground && npm install`
+12. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
+13. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
+14. **Show the user** the running Storybook and mention the Claude Prompt panel
+15. **When prompt watcher exits** (prompt received), read `.prompt.json`, apply changes, then restart the watcher
 
 ## Limio Setup Workflow
 
 When the user asks to "set up Limio", "configure Limio", or "connect to Limio":
 
-1. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-2. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
-3. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-4. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-5. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `/api/deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-6. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
-7. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
-8. **Install dependencies:** `cd component-playground && npm install`
-9. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
-10. **Tell the user:** "Storybook is running at http://localhost:6006 — open **Tools > Limio Setup** in the sidebar to connect your Limio account."
-11. **Start the prompt watcher loop** (see "Start Storybook" section)
+1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
+2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+3. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
+4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
+5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
+6. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
+7. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
+8. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
+9. **Install dependencies:** `cd component-playground && npm install`
+10. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
+11. **Tell the user:** "Storybook is running at http://localhost:6006 — open **Tools > Limio Setup** in the sidebar to connect your Limio account."
+12. **Start the prompt watcher loop** (see "Start Storybook" section)
 
 This flow ensures that even a brand-new project with no Storybook gets everything bootstrapped in one command.
 
@@ -70,17 +77,18 @@ This flow ensures that even a brand-new project with no Storybook gets everythin
 
 When the user asks to "launch storybook", "start storybook", "run storybook", or "open storybook":
 
-1. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-2. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
-3. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-4. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-5. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `/api/deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-6. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
-7. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
-8. **Install dependencies if needed:** `cd component-playground && npm install`
-9. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
-10. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
-11. **Tell the user:** "Storybook is running at http://localhost:6006" and list any available stories
+1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
+2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
+3. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
+4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
+5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
+6. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
+7. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
+8. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
+9. **Install dependencies if needed:** `cd component-playground && npm install`
+10. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
+11. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
+12. **Tell the user:** "Storybook is running at http://localhost:6006" and list any available stories
 
 This is the quick-launch path — it skips component creation and just starts the dev environment.
 
@@ -841,6 +849,7 @@ component-playground/
 │       └── NewComponent.stories.js
 ├── .prompt.json          (transient — add to .gitignore)
 ├── .prompt-status.json   (transient — add to .gitignore)
+├── .deploy-status.json   (transient — add to .gitignore)
 └── package.json
 ```
 
@@ -941,7 +950,20 @@ export default preview
 
 ### component-playground/.storybook/claude-overlay.js
 
-This overlay shows a polished loading screen while Claude Code is working. It polls `/api/prompt-status` and displays animated phases, a pulsing ring logo, and success/error states with smooth transitions.
+This overlay shows a polished loading screen while Claude Code is working. It polls `/api/prompt-status` and displays animated phases, a pulsing ring logo, and success/error states with smooth transitions. It also includes a deploy overlay with rocket animation and progress bar that polls `/api/deploy-overlay` to show deployment status.
+
+Use the actual file at `component-playground/.storybook/claude-overlay.js` as the source of truth — it evolves faster than this template.
+
+Key components in the file:
+- **useStatusPoller** — polls `/api/prompt-status` every 800ms
+- **useDeployPoller** — polls `/api/deploy-overlay` every 1000ms
+- **PulsingRing** — animated "C" logo with radiating rings
+- **RocketIcon** — SVG rocket with exhaust particles, glow, and flame animations for deploy
+- **ProgressBar** — deploy progress bar (0-100%) with shimmer effect
+- **DeployOverlay** — full-screen overlay for deploy status (pushing/building/success/error) with rocket animation, progress bar, "Open Page Builder" link on success, and auto-dismiss on error
+- **ClaudeOverlay** (exported) — full-screen overlay for prompt status (working/completed/error) with pulsing ring, phase messages, and auto-dismiss. Also renders `<DeployOverlay />` alongside itself.
+
+The ClaudeOverlay auto-dismisses when status returns to `listening` (i.e. another session reset it). DeployOverlay auto-dismisses errors after 4 seconds and resets deploy status to `idle` on dismiss.
 
 ```javascript
 import React, { useState, useEffect, useRef } from "react"
@@ -985,6 +1007,27 @@ function useStatusPoller() {
     return status
 }
 
+function useDeployPoller() {
+    const [deploy, setDeploy] = useState({ state: "idle", message: "", progress: 0 })
+
+    useEffect(() => {
+        let active = true
+        const poll = async () => {
+            try {
+                const res = await fetch("/api/deploy-overlay")
+                if (res.ok && active) {
+                    setDeploy(await res.json())
+                }
+            } catch {}
+        }
+        poll()
+        const id = setInterval(poll, 1000)
+        return () => { active = false; clearInterval(id) }
+    }, [])
+
+    return deploy
+}
+
 function PulsingRing() {
     return (
         <div style={styles.ringContainer}>
@@ -998,71 +1041,138 @@ function PulsingRing() {
     )
 }
 
-export function ClaudeOverlay() {
-    const status = useStatusPoller()
-    const [phaseIndex, setPhaseIndex] = useState(0)
+function RocketIcon({ launching }) {
+    return (
+        <div style={{
+            position: "relative",
+            width: "80px",
+            height: "80px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+        }}>
+            {/* Exhaust particles */}
+            {launching && (
+                <>
+                    <div style={{ position: "absolute", bottom: "2px", left: "50%", transform: "translateX(-50%)", width: "20px", height: "30px", overflow: "hidden" }}>
+                        <div style={{ position: "absolute", width: "4px", height: "4px", borderRadius: "50%", background: "#F59E0B", left: "4px", animation: "deploy-particle 0.8s ease-out infinite" }} />
+                        <div style={{ position: "absolute", width: "3px", height: "3px", borderRadius: "50%", background: "#EF4444", left: "10px", animation: "deploy-particle 0.8s ease-out 0.2s infinite" }} />
+                        <div style={{ position: "absolute", width: "3px", height: "3px", borderRadius: "50%", background: "#F97316", left: "7px", animation: "deploy-particle 0.8s ease-out 0.4s infinite" }} />
+                    </div>
+                    {/* Glow under rocket */}
+                    <div style={{
+                        position: "absolute",
+                        bottom: "0",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        width: "40px",
+                        height: "20px",
+                        borderRadius: "50%",
+                        background: "radial-gradient(ellipse, rgba(249, 115, 22, 0.4) 0%, transparent 70%)",
+                        animation: "deploy-glow 0.6s ease-in-out infinite alternate",
+                    }} />
+                </>
+            )}
+            <svg
+                width="48"
+                height="48"
+                viewBox="0 0 48 48"
+                fill="none"
+                style={{
+                    animation: launching ? "deploy-hover 1.2s ease-in-out infinite" : "none",
+                    filter: launching ? "drop-shadow(0 4px 12px rgba(13, 159, 110, 0.3))" : "none",
+                }}
+            >
+                {/* Rocket body */}
+                <path d="M24 6C24 6 18 14 18 26L21 30H27L30 26C30 14 24 6 24 6Z" fill="#0d9f6e" />
+                {/* Nose cone */}
+                <path d="M24 6C24 6 21 12 21 16L24 10L27 16C27 12 24 6 24 6Z" fill="#10B981" />
+                {/* Window */}
+                <circle cx="24" cy="20" r="3" fill="#ECFDF5" stroke="#0d9f6e" strokeWidth="0.5" />
+                <circle cx="24" cy="20" r="1.5" fill="#6EE7B7" />
+                {/* Fins */}
+                <path d="M18 24L14 30L18 28Z" fill="#059669" />
+                <path d="M30 24L34 30L30 28Z" fill="#059669" />
+                {/* Exhaust nozzle */}
+                <path d="M21 30L22 34H26L27 30" fill="#6B7280" />
+                {/* Flame */}
+                {launching && (
+                    <>
+                        <path d="M22.5 34L24 42L25.5 34" fill="#F59E0B" style={{ animation: "deploy-flame 0.3s ease-in-out infinite alternate" }} />
+                        <path d="M23 34L24 39L25 34" fill="#EF4444" style={{ animation: "deploy-flame 0.3s ease-in-out 0.15s infinite alternate" }} />
+                    </>
+                )}
+            </svg>
+        </div>
+    )
+}
+
+function ProgressBar({ progress, status }) {
+    const barColor = status === "error" ? "#EF4444" : status === "success" ? "#10B981" : "#0d9f6e"
+    return (
+        <div style={styles.progressContainer}>
+            <div style={styles.progressTrack}>
+                <div style={{
+                    ...styles.progressFill,
+                    width: `${Math.min(100, Math.max(0, progress))}%`,
+                    background: barColor,
+                    transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
+                }}>
+                    {progress > 15 && progress < 100 && (
+                        <div style={styles.progressShimmer} />
+                    )}
+                </div>
+            </div>
+            <span style={styles.progressLabel}>{Math.round(progress)}%</span>
+        </div>
+    )
+}
+
+function DeployOverlay() {
+    const deploy = useDeployPoller()
     const [visible, setVisible] = useState(false)
     const [exiting, setExiting] = useState(false)
-    const phaseTimer = useRef(null)
+    const [limioBaseUrl, setLimioBaseUrl] = useState("")
 
-    const isActive = status.state === "working" || status.state === "queued" || status.state === "received"
-    const isCompleted = status.state === "completed"
-    const isError = status.state === "error"
+    const isActive = deploy.state === "pushing" || deploy.state === "building"
+    const isSuccess = deploy.state === "success"
+    const isError = deploy.state === "error" || deploy.state === "timeout"
 
-    // Show overlay when active
+    useEffect(() => {
+        fetch("/api/limio/status")
+            .then(r => r.json())
+            .then(data => { if (data.baseUrl) setLimioBaseUrl(data.baseUrl) })
+            .catch(() => {})
+    }, [])
+
     useEffect(() => {
         if (isActive) {
             setVisible(true)
             setExiting(false)
-            setPhaseIndex(0)
         }
     }, [isActive])
 
-    // Cycle through phases while working
-    useEffect(() => {
-        if (isActive) {
-            phaseTimer.current = setInterval(() => {
-                setPhaseIndex(prev => (prev + 1) % PHASES.length)
-            }, 2800)
-            return () => clearInterval(phaseTimer.current)
-        }
-    }, [isActive])
+    const dismiss = () => {
+        setExiting(true)
+        setTimeout(() => {
+            setVisible(false)
+            setExiting(false)
+            fetch("/api/deploy-overlay", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ state: "idle", message: "", progress: 0 }),
+            }).catch(() => {})
+        }, 600)
+    }
 
-    // Handle completed: show briefly then fade out
-    useEffect(() => {
-        if (isCompleted && visible) {
-            clearInterval(phaseTimer.current)
-            const timeout = setTimeout(() => {
-                setExiting(true)
-                setTimeout(() => {
-                    setVisible(false)
-                    setExiting(false)
-                }, 600)
-            }, 2000)
-            return () => clearTimeout(timeout)
-        }
-    }, [isCompleted, visible])
-
-    // Handle error: show briefly then fade out
     useEffect(() => {
         if (isError && visible) {
-            clearInterval(phaseTimer.current)
-            const timeout = setTimeout(() => {
-                setExiting(true)
-                setTimeout(() => {
-                    setVisible(false)
-                    setExiting(false)
-                }, 600)
-            }, 3000)
+            const timeout = setTimeout(dismiss, 4000)
             return () => clearTimeout(timeout)
         }
     }, [isError, visible])
 
     if (!visible) return null
-
-    const phase = PHASES[phaseIndex]
-    const completedMsg = COMPLETED_MESSAGES[Math.floor(Math.random() * COMPLETED_MESSAGES.length)]
-    const displayMessage = status.message || (isCompleted ? completedMsg : isError ? "Something went wrong" : phase.message)
 
     return (
         <div style={{
@@ -1070,14 +1180,14 @@ export function ClaudeOverlay() {
             opacity: exiting ? 0 : 1,
             transition: "opacity 0.6s ease",
         }}>
-            <style>{keyframes}</style>
+            <style>{deployKeyframes}</style>
             <div style={{
                 ...styles.dialog,
                 animation: exiting ? "claude-slideDown 0.5s ease forwards" : "claude-slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
             }}>
                 <div style={styles.dialogInner}>
-                    {isActive && <PulsingRing />}
-                    {isCompleted && (
+                    {isActive && <RocketIcon launching={true} />}
+                    {isSuccess && (
                         <div style={styles.successIcon}>
                             <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
                                 <circle cx="24" cy="24" r="24" fill="#10B981" />
@@ -1094,17 +1204,190 @@ export function ClaudeOverlay() {
                         </div>
                     )}
 
+                    {(isActive || isSuccess) && (
+                        <ProgressBar progress={deploy.progress || 0} status={deploy.state} />
+                    )}
+
                     <div style={styles.messageArea}>
                         <p style={{
                             ...styles.message,
-                            color: isCompleted ? "#10B981" : isError ? "#EF4444" : "#1a1f36",
+                            color: isSuccess ? "#10B981" : isError ? "#EF4444" : "#1a1f36",
                         }}>
-                            {displayMessage}
+                            {deploy.message || "Deploying..."}
                         </p>
+                        {deploy.component && isActive && (
+                            <p style={{ fontSize: "13px", color: "#697386", margin: "4px 0 0", fontWeight: "500" }}>
+                                {deploy.component}
+                            </p>
+                        )}
                     </div>
+
+                    {isSuccess && (
+                        <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
+                            {limioBaseUrl && (
+                                <a
+                                    href={`${limioBaseUrl}/catalog/pages2`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: "6px",
+                                        padding: "10px 20px",
+                                        borderRadius: "10px",
+                                        background: "#0d9f6e",
+                                        color: "#fff",
+                                        fontSize: "14px",
+                                        fontWeight: "600",
+                                        textDecoration: "none",
+                                        cursor: "pointer",
+                                        transition: "transform 0.15s",
+                                    }}
+                                >
+                                    Open Page Builder &#8599;
+                                </a>
+                            )}
+                            <button
+                                onClick={dismiss}
+                                style={{
+                                    display: "inline-flex",
+                                    alignItems: "center",
+                                    padding: "10px 16px",
+                                    borderRadius: "10px",
+                                    border: "1px solid #e3e8ee",
+                                    background: "#fff",
+                                    color: "#697386",
+                                    fontSize: "14px",
+                                    fontWeight: "600",
+                                    cursor: "pointer",
+                                    fontFamily: "inherit",
+                                }}
+                            >
+                                Dismiss
+                            </button>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>
+    )
+}
+
+export function ClaudeOverlay() {
+    const status = useStatusPoller()
+    const [phaseIndex, setPhaseIndex] = useState(0)
+    const [visible, setVisible] = useState(false)
+    const [exiting, setExiting] = useState(false)
+    const phaseTimer = useRef(null)
+
+    const isActive = status.state === "working" || status.state === "queued" || status.state === "received"
+    const isCompleted = status.state === "completed"
+    const isError = status.state === "error"
+
+    // Show overlay when active, hide when back to listening
+    useEffect(() => {
+        if (isActive) {
+            setVisible(true)
+            setExiting(false)
+            setPhaseIndex(0)
+        } else if (status.state === "listening" && visible && !exiting) {
+            setExiting(true)
+            setTimeout(() => {
+                setVisible(false)
+                setExiting(false)
+            }, 600)
+        }
+    }, [isActive, status.state])
+
+    useEffect(() => {
+        if (isActive) {
+            phaseTimer.current = setInterval(() => {
+                setPhaseIndex(prev => (prev + 1) % PHASES.length)
+            }, 2800)
+            return () => clearInterval(phaseTimer.current)
+        }
+    }, [isActive])
+
+    useEffect(() => {
+        if (isCompleted && visible) {
+            clearInterval(phaseTimer.current)
+            const timeout = setTimeout(() => {
+                setExiting(true)
+                setTimeout(() => {
+                    setVisible(false)
+                    setExiting(false)
+                }, 600)
+            }, 2000)
+            return () => clearTimeout(timeout)
+        }
+    }, [isCompleted, visible])
+
+    useEffect(() => {
+        if (isError && visible) {
+            clearInterval(phaseTimer.current)
+            const timeout = setTimeout(() => {
+                setExiting(true)
+                setTimeout(() => {
+                    setVisible(false)
+                    setExiting(false)
+                }, 600)
+            }, 3000)
+            return () => clearTimeout(timeout)
+        }
+    }, [isError, visible])
+
+    const phase = PHASES[phaseIndex]
+    const completedMsg = COMPLETED_MESSAGES[Math.floor(Math.random() * COMPLETED_MESSAGES.length)]
+    const displayMessage = status.message || (isCompleted ? completedMsg : isError ? "Something went wrong" : phase.message)
+
+    return (
+        <>
+            {/* Prompt overlay */}
+            {visible && (
+                <div style={{
+                    ...styles.overlay,
+                    opacity: exiting ? 0 : 1,
+                    transition: "opacity 0.6s ease",
+                }}>
+                    <style>{keyframes}</style>
+                    <div style={{
+                        ...styles.dialog,
+                        animation: exiting ? "claude-slideDown 0.5s ease forwards" : "claude-slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
+                    }}>
+                        <div style={styles.dialogInner}>
+                            {isActive && <PulsingRing />}
+                            {isCompleted && (
+                                <div style={styles.successIcon}>
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                        <circle cx="24" cy="24" r="24" fill="#10B981" />
+                                        <path d="M15 24.5L21 30.5L33 18.5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 30, strokeDashoffset: 0, animation: "claude-checkDraw 0.5s ease 0.2s both" }} />
+                                    </svg>
+                                </div>
+                            )}
+                            {isError && (
+                                <div style={styles.errorIcon}>
+                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
+                                        <circle cx="24" cy="24" r="24" fill="#EF4444" />
+                                        <path d="M17 17L31 31M31 17L17 31" stroke="white" strokeWidth="3" strokeLinecap="round" />
+                                    </svg>
+                                </div>
+                            )}
+                            <div style={styles.messageArea}>
+                                <p style={{
+                                    ...styles.message,
+                                    color: isCompleted ? "#10B981" : isError ? "#EF4444" : "#1a1f36",
+                                }}>
+                                    {displayMessage}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Deploy overlay */}
+            <DeployOverlay />
+        </>
     )
 }
 
@@ -1129,13 +1412,33 @@ const keyframes = `
     0%, 100% { transform: scale(1); opacity: 0.15; }
     50%      { transform: scale(2); opacity: 0; }
 }
-@keyframes claude-spin {
-    from { transform: translate(-50%, -50%) rotate(0deg); }
-    to   { transform: translate(-50%, -50%) rotate(360deg); }
-}
 @keyframes claude-checkDraw {
     from { stroke-dashoffset: 30; }
     to   { stroke-dashoffset: 0; }
+}
+`
+
+const deployKeyframes = `
+${keyframes}
+@keyframes deploy-hover {
+    0%, 100% { transform: translateY(2px); }
+    50%      { transform: translateY(-4px); }
+}
+@keyframes deploy-flame {
+    from { transform: scaleY(0.8) scaleX(0.9); }
+    to   { transform: scaleY(1.2) scaleX(1.1); }
+}
+@keyframes deploy-particle {
+    0%   { transform: translateY(0); opacity: 1; }
+    100% { transform: translateY(20px); opacity: 0; }
+}
+@keyframes deploy-glow {
+    from { opacity: 0.3; transform: translateX(-50%) scale(0.9); }
+    to   { opacity: 0.6; transform: translateX(-50%) scale(1.1); }
+}
+@keyframes deploy-shimmer {
+    from { transform: translateX(-100%); }
+    to   { transform: translateX(200%); }
 }
 `
 
@@ -1221,6 +1524,39 @@ const styles = {
     },
     errorIcon: {
         animation: "claude-slideIn 0.4s ease",
+    },
+    progressContainer: {
+        width: "100%",
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+    },
+    progressTrack: {
+        flex: 1,
+        height: "8px",
+        borderRadius: "4px",
+        background: "#E5E7EB",
+        overflow: "hidden",
+        position: "relative",
+    },
+    progressFill: {
+        height: "100%",
+        borderRadius: "4px",
+        position: "relative",
+        overflow: "hidden",
+    },
+    progressShimmer: {
+        position: "absolute",
+        inset: 0,
+        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
+        animation: "deploy-shimmer 1.5s ease-in-out infinite",
+    },
+    progressLabel: {
+        fontSize: "13px",
+        fontWeight: "700",
+        color: "#697386",
+        minWidth: "36px",
+        textAlign: "right",
     },
 }
 ```
@@ -1517,8 +1853,12 @@ When the addon already exists, check these markers to determine if it needs upda
 | Loading overlay | claude-overlay.js | `ClaudeOverlay` |
 | New component tool | src/stories/NewComponent.stories.js | `Tools/New Component` |
 | Overlay decorator | preview.js | `ClaudeOverlay` |
+| Deploy overlay | claude-overlay.js | `DeployOverlay` |
+| Deploy status endpoint | middleware.js | `/api/deploy-overlay` |
+| Smart deploy (pull/rebase) | middleware.js | `smart-deploy` |
+| Credential safety | root .gitignore | `.limio.json` |
 
-If **any** marker is missing from its respective file, replace **both** `manager.js` and `middleware.js` with the current templates below. If `claude-overlay.js` is missing, create it and update `preview.js`. If `NewComponent.stories.js` is missing, create it. This ensures all features stay in sync.
+If **any** marker is missing from its respective file, replace **both** `manager.js` and `middleware.js` with the current templates below. If `claude-overlay.js` is missing, create it and update `preview.js`. If `NewComponent.stories.js` is missing, create it. If `.limio.json` is not in the root `.gitignore`, add it immediately. This ensures all features stay in sync.
 
 ### How it works
 
@@ -1537,6 +1877,7 @@ const { execSync } = require("child_process")
 
 const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
 const STATUS_FILE = path.resolve(__dirname, "..", ".prompt-status.json")
+const DEPLOY_STATUS_FILE = path.resolve(__dirname, "..", ".deploy-status.json")
 const PROJECT_ROOT = path.resolve(__dirname, "..", "..")
 const CONFIG_FILE = path.join(PROJECT_ROOT, ".limio.json")
 
@@ -1562,9 +1903,13 @@ function getLimioBaseUrl(config) {
 
 let tokenCache = { token: null, expiresAt: 0 }
 
-async function getAccessToken(config) {
+function invalidateToken() {
+    tokenCache = { token: null, expiresAt: 0 }
+}
+
+async function getAccessToken(config, forceRefresh) {
     const now = Date.now()
-    if (tokenCache.token && tokenCache.expiresAt > now + 60000) {
+    if (!forceRefresh && tokenCache.token && tokenCache.expiresAt > now + 60000) {
         return tokenCache.token
     }
     const baseUrl = getLimioBaseUrl(config)
@@ -1588,6 +1933,16 @@ async function getAccessToken(config) {
         expiresAt: now + (data.expires_in || 3600) * 1000,
     }
     return tokenCache.token
+}
+
+async function limioApiFetch(config, url, options) {
+    let token = await getAccessToken(config)
+    let res = await fetch(url, { ...options, headers: { ...options?.headers, Authorization: `Bearer ${token}` } })
+    if (res.status === 401) {
+        token = await getAccessToken(config, true)
+        res = await fetch(url, { ...options, headers: { ...options?.headers, Authorization: `Bearer ${token}` } })
+    }
+    return res
 }
 
 // --- Helpers ---
@@ -1674,39 +2029,133 @@ module.exports = function expressMiddleware(app) {
         }
     })
 
+    // --- smart-deploy: fetches, pulls/rebases if behind, handles conflicts ---
     app.use("/api/deploy", async (req, res, next) => {
         if (req.method === "POST") {
             const body = await readBody(req)
             const { component } = body
             if (!component) return sendJson(res, 400, { error: "component is required" })
+
+            const exec = (cmd) => execSync(cmd, { cwd: PROJECT_ROOT, encoding: "utf8", timeout: 30000 }).trim()
+            const steps = []
+
             try {
+                // 1. Validate component exists
                 const componentDir = path.join("components", component)
                 const componentPath = path.join(PROJECT_ROOT, componentDir)
-                if (!fs.existsSync(componentPath)) return sendJson(res, 400, { error: `Component folder not found: ${componentDir}` })
-                execSync(`git add ${componentDir}/`, { cwd: PROJECT_ROOT })
+                if (!fs.existsSync(componentPath)) {
+                    return sendJson(res, 400, { error: `Component folder not found: ${componentDir}` })
+                }
+
+                // 2. Get current branch and check tracking
+                const branch = exec("git rev-parse --abbrev-ref HEAD")
+                let hasUpstream = false
+                try {
+                    exec(`git rev-parse --abbrev-ref ${branch}@{upstream}`)
+                    hasUpstream = true
+                } catch {}
+                steps.push(`branch: ${branch}, upstream: ${hasUpstream}`)
+
+                // 3. Fetch remote
+                if (hasUpstream) {
+                    try { exec("git fetch origin"); steps.push("fetched origin") } catch (err) { steps.push(`fetch warning: ${err.message}`) }
+                }
+
+                // 4. Check ahead/behind
+                let behind = 0, ahead = 0
+                if (hasUpstream) {
+                    try {
+                        const counts = exec(`git rev-list --left-right --count ${branch}...origin/${branch}`)
+                        const parts = counts.split(/\s+/)
+                        ahead = parseInt(parts[0], 10) || 0
+                        behind = parseInt(parts[1], 10) || 0
+                        steps.push(`ahead: ${ahead}, behind: ${behind}`)
+                    } catch { steps.push("could not determine ahead/behind") }
+                }
+
+                // 5. If behind, stash → pull --rebase → pop
+                let didStash = false
+                if (behind > 0) {
+                    const dirtyStatus = exec("git status --porcelain")
+                    if (dirtyStatus.length > 0) {
+                        exec("git stash push -m \"deploy-auto-stash\" --include-untracked")
+                        didStash = true
+                        steps.push("stashed uncommitted changes")
+                    }
+                    try {
+                        exec("git pull --rebase origin " + branch)
+                        steps.push("pulled and rebased")
+                    } catch (pullErr) {
+                        try { exec("git rebase --abort") } catch {}
+                        if (didStash) { try { exec("git stash pop") } catch {} }
+                        return sendJson(res, 409, { error: "Merge conflict while pulling remote changes. Please resolve manually.", details: pullErr.message, steps })
+                    }
+                    if (didStash) {
+                        try { exec("git stash pop"); steps.push("restored stashed changes") } catch (popErr) {
+                            return sendJson(res, 409, { error: "Pulled successfully but local changes conflict with remote. Run 'git stash pop' and resolve.", details: popErr.message, steps })
+                        }
+                    }
+                }
+
+                // 6. Stage component + related stories
+                exec(`git add ${componentDir}/`)
+                steps.push(`staged ${componentDir}/`)
                 const storiesDir = path.join(PROJECT_ROOT, "component-playground", "src", "stories")
                 if (fs.existsSync(storiesDir)) {
                     const storyFiles = fs.readdirSync(storiesDir).filter(f => f.endsWith(".stories.js") || f.endsWith(".stories.jsx"))
                     for (const file of storyFiles) {
                         const content = fs.readFileSync(path.join(storiesDir, file), "utf8")
                         if (content.includes(component)) {
-                            execSync(`git add component-playground/src/stories/${file}`, { cwd: PROJECT_ROOT })
+                            exec(`git add component-playground/src/stories/${file}`)
+                            steps.push(`staged story: ${file}`)
                         }
                     }
                 }
-                execSync(`git commit -m "Deploy component: ${component}"`, { cwd: PROJECT_ROOT })
-                const commitHash = execSync("git rev-parse HEAD", { cwd: PROJECT_ROOT }).toString().trim()
-                execSync("git push", { cwd: PROJECT_ROOT })
-                sendJson(res, 200, { success: true, message: `Deployed ${component} successfully`, commitHash })
+
+                // 7. Check for no-op
+                const staged = exec("git diff --cached --name-only")
+                if (!staged) {
+                    return sendJson(res, 200, { success: true, message: `No changes to deploy for ${component} — already up to date`, steps, noChanges: true })
+                }
+
+                // 8. Commit + push (with retry)
+                exec(`git commit -m "Deploy component: ${component}"`)
+                const commitHash = exec("git rev-parse HEAD")
+                steps.push(`committed: ${commitHash.substring(0, 8)}`)
+
+                const pushCmd = hasUpstream ? "git push" : `git push -u origin ${branch}`
+                try {
+                    exec(pushCmd)
+                    steps.push("pushed")
+                } catch (pushErr) {
+                    steps.push(`push failed, retrying: ${pushErr.message}`)
+                    try {
+                        exec("git pull --rebase origin " + branch)
+                        exec(pushCmd)
+                        steps.push("retried pull --rebase + push: success")
+                    } catch (retryErr) {
+                        try { exec("git rebase --abort") } catch {}
+                        return sendJson(res, 409, { error: "Push failed after retry. Remote may have conflicting changes.", details: retryErr.message, steps, commitHash })
+                    }
+                }
+
+                sendJson(res, 200, { success: true, message: `Deployed ${component} successfully`, commitHash, steps, pulled: behind > 0 })
             } catch (err) {
                 console.error("Deploy error:", err.message)
-                sendJson(res, 500, { error: err.message })
+                sendJson(res, 500, { error: err.message, steps })
             }
         } else if (req.method === "GET") {
             try {
                 const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: PROJECT_ROOT }).toString().trim()
                 const status = execSync("git status --porcelain", { cwd: PROJECT_ROOT }).toString().trim()
-                sendJson(res, 200, { branch, clean: status.length === 0, status })
+                let ahead = 0, behind = 0
+                try {
+                    const counts = execSync(`git rev-list --left-right --count ${branch}...origin/${branch}`, { cwd: PROJECT_ROOT, encoding: "utf8" }).trim()
+                    const parts = counts.split(/\s+/)
+                    ahead = parseInt(parts[0], 10) || 0
+                    behind = parseInt(parts[1], 10) || 0
+                } catch {}
+                sendJson(res, 200, { branch, clean: status.length === 0, status, ahead, behind })
             } catch (err) {
                 sendJson(res, 500, { error: err.message })
             }
@@ -1738,8 +2187,8 @@ module.exports = function expressMiddleware(app) {
         }
         const config = { tenant, region: region || "eu", clientId, clientSecret }
         try {
-            tokenCache = { token: null, expiresAt: 0 }
-            await getAccessToken(config)
+            invalidateToken()
+            await getAccessToken(config, true)
         } catch (err) {
             return sendJson(res, 400, { error: `Authentication failed: ${err.message}` })
         }
@@ -1752,28 +2201,38 @@ module.exports = function expressMiddleware(app) {
     })
 
     // --- Build status proxy ---
+    // Fetches the latest build from Limio. If deployedAfter is provided,
+    // only considers builds that started after that timestamp (handles
+    // GH→CodeCommit mirroring where local commit hashes don't match).
     app.use("/api/build-status", async (req, res, next) => {
         if (req.method !== "GET") return next()
         const url = new URL(req.url, "http://localhost")
-        const commitHash = url.searchParams.get("commitHash")
-        if (!commitHash) return sendJson(res, 400, { error: "commitHash is required" })
+        const deployedAfter = url.searchParams.get("deployedAfter")
         const config = readLimioConfig()
         if (!config) return sendJson(res, 400, { error: "Limio not configured" })
         try {
-            const token = await getAccessToken(config)
             const baseUrl = getLimioBaseUrl(config)
-            const apiRes = await fetch(`${baseUrl}/api/component/builds?commitHash=${encodeURIComponent(commitHash)}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            })
+            const apiRes = await limioApiFetch(config, `${baseUrl}/api/component/builds`)
             if (!apiRes.ok) {
                 const text = await apiRes.text().catch(() => "")
                 return sendJson(res, apiRes.status, { found: false, error: `Limio API error (${apiRes.status}): ${text}` })
             }
             const data = await apiRes.json()
-            if (!data || (Array.isArray(data) && data.length === 0)) {
+            if (!data) {
                 return sendJson(res, 200, { found: false })
             }
             const build = Array.isArray(data) ? data[0] : data
+            if (!build || !build.startTime) {
+                return sendJson(res, 200, { found: false })
+            }
+            // If deployedAfter is set, only match builds that started after the deploy
+            if (deployedAfter) {
+                const buildStart = new Date(build.startTime).getTime()
+                const deployTime = new Date(deployedAfter).getTime()
+                if (buildStart < deployTime) {
+                    return sendJson(res, 200, { found: false })
+                }
+            }
             sendJson(res, 200, {
                 found: true,
                 buildStatus: build.status || build.buildStatus || "UNKNOWN",
@@ -1784,6 +2243,32 @@ module.exports = function expressMiddleware(app) {
             })
         } catch (err) {
             sendJson(res, 500, { error: err.message })
+        }
+    })
+
+    // --- Deploy overlay status ---
+    app.use("/api/deploy-overlay", async (req, res, next) => {
+        if (req.method === "POST") {
+            const body = await readBody(req)
+            const { state, message, component, progress } = body
+            if (!state) return sendJson(res, 400, { error: "state is required" })
+            try {
+                const data = { state, message: message || "", component: component || "", progress: progress || 0, timestamp: new Date().toISOString() }
+                fs.writeFileSync(DEPLOY_STATUS_FILE, JSON.stringify(data, null, 2))
+                sendJson(res, 200, { success: true })
+            } catch (err) {
+                sendJson(res, 500, { error: err.message })
+            }
+        } else if (req.method === "GET") {
+            try {
+                if (fs.existsSync(DEPLOY_STATUS_FILE)) {
+                    sendJson(res, 200, JSON.parse(fs.readFileSync(DEPLOY_STATUS_FILE, "utf8")))
+                } else {
+                    sendJson(res, 200, { state: "idle", message: "", component: "", progress: 0 })
+                }
+            } catch { sendJson(res, 200, { state: "idle", message: "", component: "", progress: 0 }) }
+        } else {
+            next()
         }
     })
 }
@@ -1801,7 +2286,7 @@ module.exports = {
 
 ### component-playground/.storybook/addon-prompt/manager.js
 
-The manager.js file registers two panels: **Claude Prompt** (for sending prompts) and **Limio Settings** (for configuring Limio credentials). It includes real-time backend status polling, deploy functionality with Limio build tracking, and the Limio connection settings form.
+The manager.js file registers two panels: **Claude Prompt** (for sending prompts) and **Limio Settings** (for configuring Limio credentials). It includes real-time backend status polling, deploy functionality with Limio build tracking, and the Limio connection settings form. The deploy flow now posts status updates to `/api/deploy-overlay` for the overlay to display.
 
 The full file is extensive (~540 lines). Key features to include when creating it:
 
@@ -1861,12 +2346,18 @@ process.on("SIGTERM", () => { clearInterval(interval); process.exit(0) })
 
 Add `path.resolve(__dirname, "addon-prompt")` to the `addons` array in `.storybook/main.js` (see the main.js template above which already includes it).
 
-### Add `.prompt.json` to `.gitignore`
+### Update `.gitignore` files
 
-Append to `component-playground/.gitignore`:
+**Root `.gitignore`** — ensure `.limio.json` is listed (contains OAuth credentials — NEVER commit):
+```
+.limio.json
+```
+
+**`component-playground/.gitignore`** — append transient files:
 ```
 .prompt.json
 .prompt-status.json
+.deploy-status.json
 ```
 
 ---
