@@ -1,100 +1,22 @@
 ---
 name: limio-component
-description: This skill should be used when the user asks to "create a Limio component", "build a subscription component", "make offer cards", "set up limio", "limio setup", "configure limio", "connect to limio", "launch storybook", "start storybook", "run storybook", "open storybook", mentions "limioProps", "Limio SDK", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform.
-version: 7.0.0
+description: Creates Limio custom React components following official SDK guidelines and best practices. Use when user asks to "create a Limio component", "build a subscription component", "make offer cards", mentions "limioProps", "@limio/sdk", "useCampaign", "useBasket", "useUser", or discusses building React components for the Limio subscription platform. Do NOT use for Storybook setup, story creation, or deployment - those have dedicated skills.
+metadata:
+  author: Limio
+  version: 8.0.0
 ---
 
-# Limio Custom Component Creation
+# Limio Component Creation
 
-Use this skill when creating custom components for the Limio subscription management platform.
+Use this skill when creating custom React components for the Limio subscription management platform. Components are created in `./components/` relative to the project root.
 
-**IMPORTANT:** This skill contains all the documentation you need for building components. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly. The one exception is checking whether Storybook is already set up (see Storybook section).
+**IMPORTANT:** This skill is self-contained — it contains all the documentation you need for building components. Do NOT explore the filesystem or search for existing component patterns. Use the templates, SDK reference, and examples provided below to create components directly. Full SDK docs are available at https://docs.limio.com/developers/limio-sdk
 
 **CRITICAL — Credential Safety:** `.limio.json` contains OAuth client credentials (client ID + client secret). It MUST be in `.gitignore` and MUST NEVER be committed to git. When committing or staging files, NEVER include `.limio.json`. If you see it in `git status` as untracked or modified, verify it is gitignored before proceeding. When creating a new project, always add `.limio.json` to the **root** `.gitignore`.
 
-**Official SDK docs:** https://docs.limio.com/developers/limio-sdk
-
-## Skill Version Check
-
-**Current version: 7.0.0** — Before running any workflow, verify the skill is up to date:
-
-1. Read the first 5 lines of this skill file and check for `version: 7.0.0`
-2. If the version is missing or lower than `6.0.0`, the skill cache is stale. Copy the latest from the source repo:
-   ```bash
-   cp /Users/benny/dev/limio-skills/skills/limio-component/SKILL.md /Users/benny/.claude/skills/limio-component/SKILL.md
-   ```
-3. Also check for these markers in the skill itself — if any are missing, the skill is outdated:
-   - `Addon Version Checking` (section heading)
-   - `SETTINGS_PANEL_ID` (in the manager.js template)
-   - `/api/deploy` (in the middleware.js template)
-   - `Skill Version Check` (this section)
-   - `ClaudeOverlay` (in the preview.js / claude-overlay.js template)
-   - `DeployOverlay` (in the claude-overlay.js template)
-   - `NewComponent` (in the NewComponent.stories.js template)
-   - `Credential Safety` (near top of skill)
-   - `smart-deploy` (in the middleware.js deploy endpoint)
-
-If the skill was updated, re-read it before continuing.
-
-## Full Workflow
-
-1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
-2. **Create the component** in `./components/` (using the reference sections below)
-3. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-4. **If no Storybook exists:** Set up the playground (see "Storybook Setup" section)
-5. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-6. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-7. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-8. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it (see "Claude Overlay" section) and update `preview.js` to import and render it
-9. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it (see "New Component Builder" section)
-10. **Create a story** for the component with multiple variations
-11. **Install dependencies** if needed: `cd component-playground && npm install`
-12. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
-13. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
-14. **Show the user** the running Storybook and mention the Claude Prompt panel
-15. **When prompt watcher exits** (prompt received), read `.prompt.json`, apply changes, then restart the watcher
-
-## Limio Setup Workflow
-
-When the user asks to "set up Limio", "configure Limio", or "connect to Limio":
-
-1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
-2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-3. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
-4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-6. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-7. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
-8. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
-9. **Install dependencies:** `cd component-playground && npm install`
-10. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006`
-11. **Tell the user:** "Storybook is running at http://localhost:6006 — open **Tools > Limio Setup** in the sidebar to connect your Limio account."
-12. **Start the prompt watcher loop** (see "Start Storybook" section)
-
-This flow ensures that even a brand-new project with no Storybook gets everything bootstrapped in one command.
-
-## Launch Storybook Workflow
-
-When the user asks to "launch storybook", "start storybook", "run storybook", or "open storybook":
-
-1. **Credential safety check:** Verify `.limio.json` is in the **root** `.gitignore`. If missing, add it immediately. This file contains OAuth secrets and must NEVER be committed.
-2. **Check for Storybook:** Look for `component-playground/.storybook/main.js`
-3. **If no Storybook exists:** Set up the full playground (see "Storybook Setup" section)
-4. **Check for Claude Prompt addon:** Look for `component-playground/.storybook/addon-prompt/manager.js`
-5. **If no addon exists:** Set up the Claude Prompt addon (see "Claude Prompt Addon" section)
-6. **If addon exists, check if outdated:** grep for `SETTINGS_PANEL_ID` in `manager.js` and `smart-deploy` in `middleware.js` — if either is missing, replace both files with the current templates below (see "Addon Version Checking")
-7. **Check for Claude Overlay:** Look for `component-playground/.storybook/claude-overlay.js` — if missing, create it and update `preview.js`
-8. **Check for New Component story:** Look for `component-playground/src/stories/NewComponent.stories.js` — if missing, create it
-9. **Install dependencies if needed:** `cd component-playground && npm install`
-10. **Start Storybook:** `cd component-playground && npx storybook dev -p 6006` (run in background)
-11. **Start the prompt watcher:** `node component-playground/scripts/watch-prompts.js` (run in background)
-12. **Tell the user:** "Storybook is running at http://localhost:6006" and list any available stories
-
-This is the quick-launch path — it skips component creation and just starts the dev environment.
-
 ## Component Location
 
-**Create components in `./components/` relative to the project root.** If the directory doesn't exist, create it.
+**Create components in `./components/<component-name>/` relative to the project root.** If the directory doesn't exist, create it.
 
 ```
 /components/
@@ -139,21 +61,22 @@ component-name/
 
 You can import **any public npm library** in the dependencies. Limio's build system will bundle them.
 
-**Prefer SDKs/libraries over custom code** - makes components easier to maintain and more reliable.
+**Prefer SDKs/libraries over custom code** — makes components easier to maintain and more reliable.
 
 **Common libraries:**
-- `ramda` - Functional utilities (groupBy, prop, etc.)
-- `xss` - HTML sanitization (required for rich text)
-- `@mui/material` - Material UI (use **5.16.12** for React 19 compatibility)
-- `@emotion/react` / `@emotion/styled` - Required for MUI
-- `date-fns` or `dayjs` - Date formatting
+- `ramda` — Functional utilities (groupBy, prop, etc.)
+- `xss` — HTML sanitization (required for rich text)
+- `@mui/material` — Material UI (use **5.16.12** for React 19 compatibility)
+- `@emotion/react` / `@emotion/styled` — Required for MUI
+- `date-fns` or `dayjs` — Date formatting
 
 ## componentStaticProps.js
 
 **Important:** Use default import for package.json, not `import * as`.
 
 ```javascript
-import { useComponentProps, getPropsFromPackageJson } from "@limio/sdk"
+import { useComponentProps } from "@limio/sdk"
+import { getPropsFromPackageJson } from "@limio/components/helpers"
 import packageData from "./package.json"
 
 const defaultComponentProps = getPropsFromPackageJson(packageData)
@@ -162,6 +85,8 @@ export function useStaticProps() {
     return useComponentProps(defaultComponentProps)
 }
 ```
+
+**Note:** In the Storybook playground, `getPropsFromPackageJson` is mocked from `@limio/sdk` instead. Both import paths work — use `@limio/components/helpers` for production components.
 
 ## Self-Contained Components
 
@@ -172,6 +97,8 @@ Instead, use SDK utilities (`formatCurrency`, `formatDate`, `checkActiveOffers`,
 ---
 
 ## limioProps Types
+
+Quick summary of each type with examples. For the full reference with all options, see `references/prop-types.md`.
 
 ### String
 ```json
@@ -190,7 +117,7 @@ Instead, use SDK utilities (`formatCurrency`, `formatDate`, `checkActiveOffers`,
 
 ### Rich Text (HTML)
 ```json
-{ "id": "description__limio_richtext", "label": "Description", "type": "richText", "default": "<p>Content</p>" }
+{ "id": "description", "label": "Description", "type": "richtext", "default": "<p>Content</p>" }
 ```
 
 ### Color
@@ -237,25 +164,25 @@ Instead, use SDK utilities (`formatCurrency`, `formatDate`, `checkActiveOffers`,
 
 **Important:** List items are `{id, label}` objects, not plain strings.
 
+For detailed prop types reference including schema type and naming conventions, see `references/prop-types.md`.
+
 ---
 
-## Limio SDK - Page/Campaign
+## SDK Hooks Quick Reference
+
+Brief imports and usage for each hook. For the full SDK reference with complete return shapes, see `references/sdk-hooks-quickref.md`.
 
 ### useCampaign
-Returns page/campaign data including offers.
-
 ```javascript
 import { useCampaign } from "@limio/sdk"
 
 const { offers, campaign, addOns, tag, groupValues } = useCampaign()
 ```
-
-**Returns:**
-- `campaign` - Page metadata: `{ name, path, attributes }`
-- `offers` - Array of subscription products
-- `addOns` - Array of optional products/upsells
-- `tag` - Entry tracking tag (e.g., "/tags/dummytag")
-- `groupValues` - Array of `{ label, id }` for offer categorization
+- `campaign` — Page metadata: `{ name, path, attributes }`
+- `offers` — Array of subscription products
+- `addOns` — Array of optional products/upsells
+- `tag` — Entry tracking tag (e.g., "/tags/dummytag")
+- `groupValues` — Array of `{ label, id }` for offer categorization
 
 ### groupOffers Utility
 ```javascript
@@ -265,73 +192,6 @@ const grouped = groupOffers(offers, groupLabels)
 // Returns: Array<{ groupId, id, label, offers, thumbnail }>
 ```
 
----
-
-## Offer Object Structure
-
-```javascript
-offer = {
-  id: "unique-id",
-  name: "Offer Name",
-  path: "/offers/offer-name",
-  parent_path: "/pages/page-name",
-  type: "item",
-  data: {
-    attributes: {
-      // Display
-      display_name__limio: "Premium Plan",
-      display_price__limio: "<span>$9.99</span>/mo",
-      detailed_display_price__limio: "Billed annually at $119.88",
-      offer_features__limio: "<ul><li>Feature 1</li></ul>",
-      cta_text__limio: "Subscribe Now",
-      checkout_description__limio: "Premium subscription",
-
-      // Grouping & Flags
-      group__limio: "monthly",
-      best_value__limio: true,
-      badge_text__limio: "Most Popular",
-
-      // Commerce
-      payment_types__limio: ["card", "paypal"],
-      allowed_countries__limio: ["US", "GB"],
-      allow_multibuy__limio: false,
-      autoRenew__limio: true,
-
-      // Cross-sell/Upsell
-      cross_sell_addons__limio: [...],
-      cross_sell_offers__limio: [...],
-      upsell_offers__limio: [...],
-
-      // Term
-      term__limio: { renewal_type, renewal_trigger },
-      initial_term__limio: { renewal_type, renewal_trigger }
-    },
-    price: [{
-      name: "Monthly charge",
-      value: 9.99,
-      currencyCode: "USD",
-      type: "recurring",
-      trigger: "subscription_start",
-      repeat_interval: 1,
-      repeat_interval_type: "months"
-    }],
-    products: [{
-      path: "/products/product-name",
-      name: "Product",
-      attributes: { display_name, product_code }
-    }],
-    attachments: [{
-      type: "image",
-      url: "https://..."
-    }]
-  }
-}
-```
-
----
-
-## Limio SDK - Basket
-
 ### useBasket
 ```javascript
 import { useBasket } from "@limio/sdk"
@@ -340,27 +200,57 @@ import { getCurrentBasketId } from "@limio/shop/src/shop/checkout/basket"
 const {
   orderItems,           // Current basket items
   basketLoading,        // Boolean for async operations
-  formattedTotal,       // e.g., "£10.00"
-  pageOptions,          // Page config settings
-  expiresAt,            // Basket expiration timestamp
   initiateCheckout,
   addOfferToBasket,
   removeFromBasket,
-  updateItemQuantity,
-  swapOffer,
-  clearOrderItems,
   navigateToCheckout,
-  redeemPromoCode,
-  removePromoCode,
-  updateCustomField,
-  setCheckoutDisabled,
-  validateBasket,
-  updateBasketDetails,
-  selectOfferForSubscriptionUpdate,
+  // ... see references/sdk-hooks-quickref.md for full list
 } = useBasket()
 ```
 
-### Add to Basket Pattern
+### getCurrentBasketId
+```javascript
+import { getCurrentBasketId } from "@limio/shop/src/shop/checkout/basket"
+```
+
+### useUser
+```javascript
+import { useUser } from "@limio/sdk"
+
+const { attributes, loginStatus, loaded, token } = useUser()
+```
+
+### useSubscriptions
+```javascript
+import { useSubscriptions } from "@limio/sdk"
+
+const { subscriptions } = useSubscriptions()
+```
+
+### useLimioContext
+```javascript
+import { useLimioContext } from "@limio/sdk"
+
+const { isInPageBuilder } = useLimioContext() || {}
+```
+
+### useCheckout
+```javascript
+import { useCheckout } from "@limio/internal-checkout-sdk"
+
+const { useCheckoutSelector } = useCheckout({ redirectOnFailure: false })
+const order = useCheckoutSelector((state) => state.order)
+const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
+```
+
+For full SDK reference including all hook return shapes, utility functions, and subscription helpers, see `references/sdk-hooks-quickref.md`.
+
+---
+
+## Add to Basket Pattern
+
+The standard pattern for adding offers to the basket:
+
 ```javascript
 const handleAddToBasket = async (offer) => {
   const checkoutId = getCurrentBasketId()
@@ -374,353 +264,6 @@ const handleAddToBasket = async (offer) => {
   }
 }
 ```
-
-### Key Methods
-- `initiateCheckout({ order: { orderItems: [{ offer }] } })` - Create new basket
-- `addOfferToBasket({ offer, quantity?, type?, parentId? })` - Add to existing basket
-- `removeFromBasket({ id })` - Remove by OrderItem ID
-- `updateItemQuantity(itemId, quantity)` - Update quantity
-- `swapOffer(itemId, offer)` - Replace item with different offer
-- `clearOrderItems()` - Empty basket
-- `navigateToCheckout()` - Go to checkout page
-- `redeemPromoCode(promoCode)` - Apply discount
-- `removePromoCode(promoCode)` - Remove discount
-- `updateBasketDetails(details)` - Update basket metadata
-- `selectOfferForSubscriptionUpdate(offer)` - Designate offer for subscription change
-
----
-
-## Limio SDK - User
-
-### useUser
-```javascript
-import { useUser } from "@limio/sdk"
-
-const { attributes, subscriptions, loginStatus, loaded, token } = useUser()
-```
-
-**Returns:**
-- `attributes` - User identity: `{ email, email_verified, firstName, lastName, sub, crm_id, ... }`
-- `subscriptions` - Array of user's subscriptions
-- `loginStatus` - "logged-in" or other states
-- `loaded` - Boolean for data availability
-- `token` - JWT access token
-
-### useSubscriptions
-```javascript
-import { useSubscriptions } from "@limio/sdk"
-
-const { subscriptions } = useSubscriptions()
-```
-
-**Subscription object:**
-```javascript
-{
-  name: "Premium",
-  status: "active",              // "active" | "cancelled" | etc.
-  id: "sub-...",
-  reference: "1KPEEEJ8RNF8",    // Customer-facing ref
-  created: "2024-01-15T...",
-  record_type: "subscription",
-  mode: "production",
-  offers: [                       // Array of offers — the documented access pattern
-    {
-      data: {
-        start: "2024-01-15T...",
-        end: null,                // null if still active
-        record_subtype: "base",   // "discount" = discount offer; anything else (or absent) = standard offer
-        offer: {                  // Full offer object with data.attributes etc.
-          data: {
-            attributes: { display_name__limio, price__limio, term__limio, ... },
-            products: [{ name: "Product Name", attributes: { display_name__limio, product_code__limio } }]
-          }
-        }
-      }
-    }
-  ],
-  schedule: [                    // Payment schedule
-    {
-      id: "schedule-...",        // Unique ID — use as React key
-      data: { date, amount, currency, description, type: "payment" },
-      status: "active"           // "active" | "pending" | "pending-external" | "cancelled"
-    }
-  ]
-}
-```
-
-**Important:** Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
-
-### useSubInfo
-```javascript
-import { useSubInfo } from "@limio/sdk"
-
-const { status, isGift, quantity, hasLapsed, hasPendingChange } = useSubInfo(subscription)
-```
-
-### useSchedule
-```javascript
-import { useSchedule } from "@limio/sdk"
-
-const { nextPaymentAmount, renewalPrice, termStartDate, termEndDate } = useSchedule(subscription)
-// Returns formatted values: "£9.99", "14 Dec 2024"
-```
-
-### useUserInvoices
-```javascript
-const { invoices, revalidate, mutate } = useUserInvoices()
-```
-
-### Subscription Utility Functions
-```javascript
-import {
-  getCurrentAddress,      // (type, addresses) => address object
-  getPriceFromSchedule,   // (schedule, country?) => { value, currencyCode }
-  getCurrentOffer,        // (subscription) => offer
-  getPeriodForOffer,      // (offer) => "1 month" | "1 year" | "N/A"
-  getRenewalDateForUserSubscription,  // (subscription) => formatted date
-  getPriceForUserSubscription,        // (subscription) => formatted price
-} from "@limio/sdk"
-```
-
-### Subscription References
-Use `subscription.reference` or `subscription.id` for linking between pages. Pass as URL query params (e.g. `?subRef=...` or `?subId=...`).
-
----
-
-## Limio SDK - Pricing
-
-### useCheckout
-```javascript
-import { useCheckout } from "@limio/sdk"
-
-const { useCheckoutSelector } = useCheckout({ redirectOnFailure: true })
-const checkoutState = useCheckoutSelector(state => state) || {}
-const { order, paidSchedule, schedule, locale } = checkoutState
-const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
-```
-
-**orderTotals object:**
-- `orderSubtotal` - Before discounts/tax
-- `orderTotal` - Final total
-- `currency` - "USD", "GBP", etc.
-- `taxSummary` - Array of `{ taxCode, taxAmount, taxRate }`
-
-### usePreview
-```javascript
-import { usePreview } from "@limio/sdk"
-
-const { loadingPreview, isTaxPreviewCountry, taxCalculated } = usePreview()
-```
-
----
-
-## Limio SDK - Context
-
-### useLimioContext
-```javascript
-import { useLimioContext } from "@limio/sdk"
-
-const { isInPageBuilder } = useLimioContext() || {}
-```
-
-### Page Builder Compatibility
-
-When `isInPageBuilder` is true, the component is being rendered in the Limio Page Builder editor. Components using `position: fixed` or `position: absolute` can break out of their designated section and interfere with the Page Builder UI.
-
-**Always ensure components stay within their section bounds in Page Builder**, even if they're designed to float/stick in production:
-
-```javascript
-const { isInPageBuilder } = useLimioContext() || {}
-
-const headerClasses = [
-    "header",
-    isInPageBuilder ? "header--static" : ""
-].filter(Boolean).join(" ")
-
-return <header className={headerClasses}>...</header>
-```
-
-```css
-.header {
-    position: fixed;  /* Floats in production */
-    top: 0;
-    z-index: 1000;
-}
-
-.header--static {
-    position: relative;  /* Stays in section in Page Builder */
-}
-```
-
----
-
-## SDK Utilities
-
-All imported from `@limio/sdk`:
-
-### HTML Sanitization
-```javascript
-import { sanitiseHTML } from "@limio/sdk"
-
-<div dangerouslySetInnerHTML={{ __html: sanitiseHTML(offer.data.attributes.offer_features__limio) }} />
-```
-
-**Note:** `sanitiseHTML` uses DOMPurify and adds security attributes like `rel="noopener noreferrer"` to links. Prefer this over the `xss` npm package for rich text content. For Storybook compatibility (where `sanitiseHTML` may not be mocked), you can fall back to `xss` as a dependency.
-
-### Error Boundary
-```javascript
-import { ErrorBoundary } from "@limio/sdk"
-
-<ErrorBoundary ErrorUI={({ error }) => <p>Error: {error.message}</p>}>
-    <RiskyChild />
-</ErrorBoundary>
-```
-
-Also available as HOC: `withErrorBoundary(Component, ErrorUI)`
-
-### Date & Currency Formatting
-```javascript
-import { formatDate, formatCurrency, formatCurrencyForCurrentLocale } from "@limio/sdk"
-
-formatDate("2024-01-15T00:00:00Z", "DATE_FULL")   // "January 15, 2024"
-formatCurrency("20.00", "GBP")                      // "£20.00"
-formatCurrencyForCurrentLocale(20, "GBP")            // Locale-aware
-```
-
-`formatDate` formats: `"DATE_EN"`, `"DATE_FULL"`, `"DATE_SHORT"`, `"DATE_MED"`
-
-### Display Price Formatting
-```javascript
-import { formatDisplayPrice } from "@limio/sdk"
-
-formatDisplayPrice("{{currencySymbol}}{{amount}}/mo", offer.data.attributes.price__limio)
-```
-
-Placeholders: `{{currencyCode}}`, `{{currencySymbol}}`, `{{currencySymbolNative}}`, `{{amount}}`, `{{integerValue}}`, `{{decimalValue}}`, `{{formattedPrice}}`, `{{formattedPriceComma}}`
-
-### Offer Info Helper
-```javascript
-import { useOfferInfo } from "@limio/sdk"
-
-const info = useOfferInfo(offer)
-// { allowMultibuy, offerDescription, hasRecurringCharge, isDelivery, productNames, isAutoRenew, offerImage, usesExternalPrice, isGift, displayName }
-```
-
-### Active Offer Filtering
-```javascript
-import { checkActiveOffers } from "@limio/sdk"
-
-const activeOffers = checkActiveOffers(subscription.offers, false)
-// Filters by start/end dates, sorted by start date
-```
-
-### Address Utilities
-```javascript
-import { addressSummary, formatCountry, getAddressMetadata, getCountryMetadata } from "@limio/sdk"
-
-addressSummary(address)      // Formatted address string or "N/A"
-formatCountry("GB")          // "United Kingdom"
-getAddressMetadata("GB")     // { requiredAddressFields, addressFieldsToRender }
-getCountryMetadata("GB")     // { name, "alpha-2", "alpha-3", "country-code" }
-```
-
-### App Settings
-```javascript
-import { LimioAppSettings } from "@limio/sdk"
-const dateFormat = LimioAppSettings.getDateFormat()
-```
-
-### DateTime (Luxon)
-```javascript
-import { DateTime } from "@limio/sdk"
-```
-
-### Invoice Fetcher
-```javascript
-import { LimioFetchers } from "@limio/sdk"
-const blob = await LimioFetchers.invoiceFetch(path, token)
-```
-
----
-
-## Offer Attachments
-
-Offers can have image attachments. To find and display an offer's image:
-
-```javascript
-const attachments = offer?.data?.attachments || []
-
-// Find image attachment
-const imageAttachment = attachments.find(a =>
-    a.type === "image" || (a.url && /\.(jpg|jpeg|png|gif|svg|webp)$/i.test(a.url))
-)
-
-// Use in component
-{imageAttachment && (
-    <img src={imageAttachment.url} alt={displayName} />
-)}
-```
-
----
-
-## Common Utilities
-
-### Contrast Color
-When using configurable background colors for buttons, calculate contrasting text color:
-
-```javascript
-const getContrastColor = (hexColor) => {
-    if (!hexColor) return "#000000"
-    const hex = hexColor.replace("#", "")
-    const r = parseInt(hex.substr(0, 2), 16)
-    const g = parseInt(hex.substr(2, 2), 16)
-    const b = parseInt(hex.substr(4, 2), 16)
-    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
-    return luminance > 0.5 ? "#000000" : "#FFFFFF"
-}
-
-// Usage
-<button style={{
-    backgroundColor: accentColor,
-    color: getContrastColor(accentColor)
-}}>
-    {ctaText}
-</button>
-```
-
----
-
-## CSS Patterns
-
-Use plain CSS with **CSS custom properties** for white-labelling. Map color limioProps to CSS variables via `style`:
-
-```javascript
-<div className="my-component" style={{ "--my-primary": primaryColor, "--my-danger": dangerColor }}>
-```
-
-```css
-.my-component {
-    --my-primary: #635BFF;
-    --my-text: #1a1f36;
-    --my-text-muted: #697386;
-    --my-border: #e3e8ee;
-    --my-bg: #f6f9fc;
-    --my-card: #ffffff;
-
-    background: var(--my-bg);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    color: var(--my-text);
-    -webkit-font-smoothing: antialiased;
-}
-```
-
-Key CSS patterns:
-- Prefix all classes with a short component abbreviation (e.g. `ad-`, `oc-`, `sp-`) to avoid collisions
-- Use `border: 1px solid var(--border)` + `border-radius: 10px` + subtle `box-shadow` for cards
-- 13px uppercase `letter-spacing: 0.06em` for section titles
-- `flex` with `justify-content: space-between` for detail rows
-- Always include `@media (max-width: 600px)` responsive breakpoint
-- Reset box-sizing: `.my-component *, .my-component *::before, .my-component *::after { box-sizing: border-box; }`
 
 ---
 
@@ -789,2171 +332,170 @@ export default MyComponent
 
 ---
 
+## CSS Patterns
+
+Use plain CSS with **CSS custom properties** for white-labelling. Map color limioProps to CSS variables via `style`:
+
+```javascript
+<div className="my-component" style={{ "--my-primary": primaryColor, "--my-danger": dangerColor }}>
+```
+
+```css
+.my-component {
+    --my-primary: #635BFF;
+    --my-text: #1a1f36;
+    --my-text-muted: #697386;
+    --my-border: #e3e8ee;
+    --my-bg: #f6f9fc;
+    --my-card: #ffffff;
+
+    background: var(--my-bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--my-text);
+    -webkit-font-smoothing: antialiased;
+}
+```
+
+Key CSS patterns:
+- Prefix all classes with a short component abbreviation (e.g. `ad-`, `oc-`, `sp-`) to avoid collisions
+- Use `border: 1px solid var(--border)` + `border-radius: 10px` + subtle `box-shadow` for cards
+- 13px uppercase `letter-spacing: 0.06em` for section titles
+- `flex` with `justify-content: space-between` for detail rows
+- Always include `@media (max-width: 600px)` responsive breakpoint
+- Reset box-sizing: `.my-component *, .my-component *::before, .my-component *::after { box-sizing: border-box; }`
+
+---
+
+## Skeleton & Error States
+
+Modern Limio components define `.Skeleton` and `.Error` static methods for loading and error states:
+
+```javascript
+const MyComponent = () => {
+    // ... component code
+}
+
+MyComponent.Skeleton = () => (
+    <div className="mc-skeleton">
+        <div className="mc-skeleton-line" style={{ width: "60%", height: 20 }} />
+        <div className="mc-skeleton-line" style={{ width: "100%", height: 16 }} />
+    </div>
+)
+
+MyComponent.Error = () => (
+    <div className="mc-error">
+        <p>Something went wrong. Please try refreshing.</p>
+    </div>
+)
+
+export default MyComponent
+```
+
+Wrap components with `ErrorBoundary` for graceful failure:
+```javascript
+import { ErrorBoundary } from "@limio/sdk"
+
+<ErrorBoundary fallback={<MyComponent.Error />}>
+    <MyComponent />
+</ErrorBoundary>
+```
+
+---
+
+## Error Handling for Basket Operations
+
+Wrap async basket operations in try/catch for resilience:
+
+```javascript
+const handleAddToBasket = async (offer) => {
+    try {
+        const checkoutId = getCurrentBasketId()
+        if (!checkoutId) {
+            await initiateCheckout({ order: { orderItems: [{ offer }] } })
+        } else {
+            await addOfferToBasket({ offer })
+        }
+        if (pageOptions?.pushToCheckout) {
+            await navigateToCheckout()
+        }
+    } catch (error) {
+        console.error("Failed to add to basket:", error)
+    }
+}
+```
+
+---
+
+## useCheckout (from @limio/internal-checkout-sdk)
+
+For components in the checkout/cart flow, use `useCheckout` from `@limio/internal-checkout-sdk`:
+
+```javascript
+import { useCheckout } from "@limio/internal-checkout-sdk"
+
+const { useCheckoutSelector } = useCheckout({ redirectOnFailure: false })
+const order = useCheckoutSelector((state) => state.order)
+const { orderItems } = order
+```
+
+This gives access to checkout state including `order`, `paidSchedule`, `schedule`, `locale`, and `nextActions` (for upgrades/downgrades/cross-sells).
+
+---
+
+## Handlebars Templating in Offer Attributes
+
+Offer attributes can contain Handlebars templates. Use `parseString` to render them:
+
+```javascript
+import { parseString, encodeDates } from "@limio/shop/src/helpers/string"
+
+const displayText = parseString(
+    offer.data.attributes.display_description__limio,
+    offer,
+    encodeDates
+)
+```
+
+limioProps can also use templates: `"default": "{{data.attributes.display_description__limio}}"`.
+
+---
+
 ## Best Practices
 
 1. **Use SDK utilities** — `sanitiseHTML`, `formatCurrency`, `formatDate`, `useOfferInfo`, `checkActiveOffers`, `groupOffers`, `getCurrentOffer`, `useSchedule`, `useSubInfo`, etc. Don't reimplement what the SDK provides.
 2. **Self-contained** — Do NOT import from `../source/utils/` or other internal paths. Use SDK utilities or inline helpers.
-3. **Null safety** — Always use optional chaining and defaults
+3. **Null safety** — Always use optional chaining and defaults:
    ```javascript
    const { offers } = useCampaign() || {}
    const attributes = offer?.data?.attributes || {}
    ```
 4. **All text configurable** — Every heading, label, button text, and URL should be a `limioProp` so the component is fully white-label.
-5. **Color props** — Use color type limioProps for any configurable color. Pass through CSS custom properties.
-6. **List props** — Items are `{id, label}` objects
-7. **Picklist options** — Use `options` array with `{id, label, value}`
-8. **Page Builder compatibility** — Components with `position: fixed/absolute` must fall back to `position: relative` when `isInPageBuilder` is true
-9. **Loading states** — Handle `basketLoading` to prevent double submissions
-10. **Sanitize HTML** — Use `xss` library or `sanitiseHTML` from SDK for rich text content
-11. **MUI version** — Use 5.16.12 for React 19 compatibility
-12. **Always create stories** — Every component should have a Storybook story with variations
+5. **Color props** — Use `"type": "color"` in limioProps (no special suffix needed on the ID). Pass through CSS custom properties.
+6. **List props** — Items are `{id, label}` objects.
+7. **Picklist options** — Use `options` array with `{id, label, value}`.
+8. **Page Builder compatibility** — Components with `position: fixed/absolute` must fall back to `position: relative` when `isInPageBuilder` is true.
+9. **Loading states** — Handle `basketLoading` to prevent double submissions.
+10. **Sanitize HTML** — Use `xss` library or `sanitiseHTML` from SDK for rich text content.
+11. **MUI version** — Use 5.16.12 for React 19 compatibility.
+12. **Contrast colors** — When using configurable background colors for buttons, calculate contrasting text color for accessibility.
 13. **Subscription references** — Use `subscription.reference` or `subscription.id` for linking. Pass as URL query params (e.g. `?subRef=...`).
 14. **Subscription offers access** — Always use `subscription.offers[]` array to access offers. Do NOT use `subscription.data.offer` (legacy). A subscription can have multiple offers (standard + discount), so filter where `record_subtype` is NOT `"discount"` and check `start`/`end` dates to find the current active standard offer.
 
 ---
 
-## Storybook Setup (One-time)
-
-If `component-playground/.storybook/main.js` does **not** exist, create the full Storybook playground. If it already exists, skip to "Creating a Story".
-
-### Directory Structure
-
-```
-component-playground/
-├── .storybook/
-│   ├── main.js
-│   ├── preview.js
-│   ├── middleware.js
-│   ├── claude-overlay.js
-│   └── addon-prompt/
-│       ├── manager.js
-│       └── preset.js
-├── packages/
-│   └── limio/
-│       ├── sdk/
-│       │   ├── index.js
-│       │   └── src/
-│       │       └── context.js
-│       ├── shop/
-│       │   └── src/
-│       │       └── shop/
-│       │           └── checkout/
-│       │               └── basket.js
-│       └── internal-checkout-sdk/
-│           └── index.js
-├── scripts/
-│   └── watch-prompts.js
-├── src/
-│   └── stories/
-│       ├── LimioSetup.stories.js
-│       └── NewComponent.stories.js
-├── .prompt.json          (transient — add to .gitignore)
-├── .prompt-status.json   (transient — add to .gitignore)
-├── .deploy-status.json   (transient — add to .gitignore)
-└── package.json
-```
-
-### component-playground/package.json
-
-```json
-{
-  "name": "@limio/component-playground",
-  "version": "0.1.0",
-  "private": true,
-  "dependencies": {
-    "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "ramda": "^0.28.0",
-    "xss": "^1.0.15"
-  },
-  "scripts": {
-    "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
-  },
-  "devDependencies": {
-    "@storybook/addon-essentials": "^8.0.0",
-    "@storybook/addon-interactions": "^8.0.0",
-    "@storybook/addon-links": "^8.0.0",
-    "@storybook/addon-webpack5-compiler-babel": "^1.0.0",
-    "@storybook/blocks": "^8.0.0",
-    "@storybook/react": "^8.0.0",
-    "@storybook/react-webpack5": "^8.0.0",
-    "storybook": "^8.0.0"
-  }
-}
-```
-
-### component-playground/.storybook/main.js
-
-```javascript
-import path, { dirname, join } from "path"
-
-function getAbsolutePath(value) {
-    return dirname(require.resolve(join(value, "package.json")))
-}
-
-const config = {
-    stories: ["../src/**/*.stories.@(js|jsx|ts|tsx)"],
-    addons: [
-        getAbsolutePath("@storybook/addon-webpack5-compiler-babel"),
-        getAbsolutePath("@storybook/addon-essentials"),
-        getAbsolutePath("@storybook/addon-interactions"),
-        path.resolve(__dirname, "addon-prompt"),
-    ],
-    framework: {
-        name: getAbsolutePath("@storybook/react-webpack5"),
-        options: {},
-    },
-    webpackFinal: async (config) => {
-        config.resolve.alias = {
-            ...config.resolve.alias,
-            "@limio/sdk": path.resolve(__dirname, "..", "packages", "limio", "sdk"),
-            "@limio/sdk/components": path.resolve(__dirname, "..", "packages", "limio", "sdk", "src", "components"),
-            "@limio/shop": path.resolve(__dirname, "..", "packages", "limio", "shop"),
-            "@limio/internal-checkout-sdk": path.resolve(__dirname, "..", "packages", "limio", "internal-checkout-sdk"),
-        }
-        return config
-    }
-}
-
-export default config
-```
-
-### component-playground/.storybook/preview.js
-
-```javascript
-import React from "react"
-import { ClaudeOverlay } from "./claude-overlay"
-
-const preview = {
-    parameters: {
-        layout: "fullscreen",
-        controls: {
-            matchers: {
-                color: /(background|color)$/i,
-                date: /Date$/i,
-            },
-        },
-    },
-    decorators: [
-        (Story) => (
-            <>
-                <Story />
-                <ClaudeOverlay />
-            </>
-        ),
-    ],
-}
-
-export default preview
-```
-
-### component-playground/.storybook/claude-overlay.js
-
-This overlay shows a polished loading screen while Claude Code is working. It polls `/api/prompt-status` and displays animated phases, a pulsing ring logo, and success/error states with smooth transitions. It also includes a deploy overlay with rocket animation and progress bar that polls `/api/deploy-overlay` to show deployment status.
-
-Use the actual file at `component-playground/.storybook/claude-overlay.js` as the source of truth — it evolves faster than this template.
-
-Key components in the file:
-- **useStatusPoller** — polls `/api/prompt-status` every 800ms
-- **useDeployPoller** — polls `/api/deploy-overlay` every 1000ms
-- **PulsingRing** — animated "C" logo with radiating rings
-- **RocketIcon** — SVG rocket with exhaust particles, glow, and flame animations for deploy
-- **ProgressBar** — deploy progress bar (0-100%) with shimmer effect
-- **DeployOverlay** — full-screen overlay for deploy status (pushing/building/success/error) with rocket animation, progress bar, "Open Page Builder" link on success, and auto-dismiss on error
-- **ClaudeOverlay** (exported) — full-screen overlay for prompt status (working/completed/error) with pulsing ring, phase messages, and auto-dismiss. Also renders `<DeployOverlay />` alongside itself.
-
-The ClaudeOverlay auto-dismisses when status returns to `listening` (i.e. another session reset it). DeployOverlay auto-dismisses errors after 4 seconds and resets deploy status to `idle` on dismiss.
-
-```javascript
-import React, { useState, useEffect, useRef } from "react"
-
-const PHASES = [
-    { message: "Prompt received..." },
-    { message: "Reading component files..." },
-    { message: "Making magic..." },
-    { message: "Writing code changes..." },
-    { message: "Sprinkling some pixels..." },
-    { message: "Almost there..." },
-]
-
-const COMPLETED_MESSAGES = [
-    "Changes applied!",
-    "All done — check it out!",
-    "Component updated!",
-]
-
-function useStatusPoller() {
-    const [status, setStatus] = useState({ state: "listening", message: "" })
-    const prevState = useRef("listening")
-
-    useEffect(() => {
-        let active = true
-        const poll = async () => {
-            try {
-                const res = await fetch("/api/prompt-status")
-                if (res.ok && active) {
-                    const data = await res.json()
-                    setStatus(data)
-                    prevState.current = data.state
-                }
-            } catch {}
-        }
-        poll()
-        const id = setInterval(poll, 800)
-        return () => { active = false; clearInterval(id) }
-    }, [])
-
-    return status
-}
-
-function useDeployPoller() {
-    const [deploy, setDeploy] = useState({ state: "idle", message: "", progress: 0 })
-
-    useEffect(() => {
-        let active = true
-        const poll = async () => {
-            try {
-                const res = await fetch("/api/deploy-overlay")
-                if (res.ok && active) {
-                    setDeploy(await res.json())
-                }
-            } catch {}
-        }
-        poll()
-        const id = setInterval(poll, 1000)
-        return () => { active = false; clearInterval(id) }
-    }, [])
-
-    return deploy
-}
-
-function PulsingRing() {
-    return (
-        <div style={styles.ringContainer}>
-            <div style={{ ...styles.ring, ...styles.ring1 }} />
-            <div style={{ ...styles.ring, ...styles.ring2 }} />
-            <div style={{ ...styles.ring, ...styles.ring3 }} />
-            <div style={styles.ringCenter}>
-                <span style={styles.ringLogo}>C</span>
-            </div>
-        </div>
-    )
-}
-
-function RocketIcon({ launching }) {
-    return (
-        <div style={{
-            position: "relative",
-            width: "80px",
-            height: "80px",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-        }}>
-            {/* Exhaust particles */}
-            {launching && (
-                <>
-                    <div style={{ position: "absolute", bottom: "2px", left: "50%", transform: "translateX(-50%)", width: "20px", height: "30px", overflow: "hidden" }}>
-                        <div style={{ position: "absolute", width: "4px", height: "4px", borderRadius: "50%", background: "#F59E0B", left: "4px", animation: "deploy-particle 0.8s ease-out infinite" }} />
-                        <div style={{ position: "absolute", width: "3px", height: "3px", borderRadius: "50%", background: "#EF4444", left: "10px", animation: "deploy-particle 0.8s ease-out 0.2s infinite" }} />
-                        <div style={{ position: "absolute", width: "3px", height: "3px", borderRadius: "50%", background: "#F97316", left: "7px", animation: "deploy-particle 0.8s ease-out 0.4s infinite" }} />
-                    </div>
-                    {/* Glow under rocket */}
-                    <div style={{
-                        position: "absolute",
-                        bottom: "0",
-                        left: "50%",
-                        transform: "translateX(-50%)",
-                        width: "40px",
-                        height: "20px",
-                        borderRadius: "50%",
-                        background: "radial-gradient(ellipse, rgba(249, 115, 22, 0.4) 0%, transparent 70%)",
-                        animation: "deploy-glow 0.6s ease-in-out infinite alternate",
-                    }} />
-                </>
-            )}
-            <svg
-                width="48"
-                height="48"
-                viewBox="0 0 48 48"
-                fill="none"
-                style={{
-                    animation: launching ? "deploy-hover 1.2s ease-in-out infinite" : "none",
-                    filter: launching ? "drop-shadow(0 4px 12px rgba(13, 159, 110, 0.3))" : "none",
-                }}
-            >
-                {/* Rocket body */}
-                <path d="M24 6C24 6 18 14 18 26L21 30H27L30 26C30 14 24 6 24 6Z" fill="#0d9f6e" />
-                {/* Nose cone */}
-                <path d="M24 6C24 6 21 12 21 16L24 10L27 16C27 12 24 6 24 6Z" fill="#10B981" />
-                {/* Window */}
-                <circle cx="24" cy="20" r="3" fill="#ECFDF5" stroke="#0d9f6e" strokeWidth="0.5" />
-                <circle cx="24" cy="20" r="1.5" fill="#6EE7B7" />
-                {/* Fins */}
-                <path d="M18 24L14 30L18 28Z" fill="#059669" />
-                <path d="M30 24L34 30L30 28Z" fill="#059669" />
-                {/* Exhaust nozzle */}
-                <path d="M21 30L22 34H26L27 30" fill="#6B7280" />
-                {/* Flame */}
-                {launching && (
-                    <>
-                        <path d="M22.5 34L24 42L25.5 34" fill="#F59E0B" style={{ animation: "deploy-flame 0.3s ease-in-out infinite alternate" }} />
-                        <path d="M23 34L24 39L25 34" fill="#EF4444" style={{ animation: "deploy-flame 0.3s ease-in-out 0.15s infinite alternate" }} />
-                    </>
-                )}
-            </svg>
-        </div>
-    )
-}
-
-function ProgressBar({ progress, status }) {
-    const barColor = status === "error" ? "#EF4444" : status === "success" ? "#10B981" : "#0d9f6e"
-    return (
-        <div style={styles.progressContainer}>
-            <div style={styles.progressTrack}>
-                <div style={{
-                    ...styles.progressFill,
-                    width: `${Math.min(100, Math.max(0, progress))}%`,
-                    background: barColor,
-                    transition: "width 0.8s cubic-bezier(0.4, 0, 0.2, 1)",
-                }}>
-                    {progress > 15 && progress < 100 && (
-                        <div style={styles.progressShimmer} />
-                    )}
-                </div>
-            </div>
-            <span style={styles.progressLabel}>{Math.round(progress)}%</span>
-        </div>
-    )
-}
-
-function DeployOverlay() {
-    const deploy = useDeployPoller()
-    const [visible, setVisible] = useState(false)
-    const [exiting, setExiting] = useState(false)
-    const [limioBaseUrl, setLimioBaseUrl] = useState("")
-
-    const isActive = deploy.state === "pushing" || deploy.state === "building"
-    const isSuccess = deploy.state === "success"
-    const isError = deploy.state === "error" || deploy.state === "timeout"
-
-    useEffect(() => {
-        fetch("/api/limio/status")
-            .then(r => r.json())
-            .then(data => { if (data.baseUrl) setLimioBaseUrl(data.baseUrl) })
-            .catch(() => {})
-    }, [])
-
-    useEffect(() => {
-        if (isActive) {
-            setVisible(true)
-            setExiting(false)
-        }
-    }, [isActive])
-
-    const dismiss = () => {
-        setExiting(true)
-        setTimeout(() => {
-            setVisible(false)
-            setExiting(false)
-            fetch("/api/deploy-overlay", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ state: "idle", message: "", progress: 0 }),
-            }).catch(() => {})
-        }, 600)
-    }
-
-    useEffect(() => {
-        if (isError && visible) {
-            const timeout = setTimeout(dismiss, 4000)
-            return () => clearTimeout(timeout)
-        }
-    }, [isError, visible])
-
-    if (!visible) return null
-
-    return (
-        <div style={{
-            ...styles.overlay,
-            opacity: exiting ? 0 : 1,
-            transition: "opacity 0.6s ease",
-        }}>
-            <style>{deployKeyframes}</style>
-            <div style={{
-                ...styles.dialog,
-                animation: exiting ? "claude-slideDown 0.5s ease forwards" : "claude-slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-            }}>
-                <div style={styles.dialogInner}>
-                    {isActive && <RocketIcon launching={true} />}
-                    {isSuccess && (
-                        <div style={styles.successIcon}>
-                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                <circle cx="24" cy="24" r="24" fill="#10B981" />
-                                <path d="M15 24.5L21 30.5L33 18.5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 30, strokeDashoffset: 0, animation: "claude-checkDraw 0.5s ease 0.2s both" }} />
-                            </svg>
-                        </div>
-                    )}
-                    {isError && (
-                        <div style={styles.errorIcon}>
-                            <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                <circle cx="24" cy="24" r="24" fill="#EF4444" />
-                                <path d="M17 17L31 31M31 17L17 31" stroke="white" strokeWidth="3" strokeLinecap="round" />
-                            </svg>
-                        </div>
-                    )}
-
-                    {(isActive || isSuccess) && (
-                        <ProgressBar progress={deploy.progress || 0} status={deploy.state} />
-                    )}
-
-                    <div style={styles.messageArea}>
-                        <p style={{
-                            ...styles.message,
-                            color: isSuccess ? "#10B981" : isError ? "#EF4444" : "#1a1f36",
-                        }}>
-                            {deploy.message || "Deploying..."}
-                        </p>
-                        {deploy.component && isActive && (
-                            <p style={{ fontSize: "13px", color: "#697386", margin: "4px 0 0", fontWeight: "500" }}>
-                                {deploy.component}
-                            </p>
-                        )}
-                    </div>
-
-                    {isSuccess && (
-                        <div style={{ display: "flex", gap: "10px", marginTop: "4px" }}>
-                            {limioBaseUrl && (
-                                <a
-                                    href={`${limioBaseUrl}/catalog/pages2`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: "6px",
-                                        padding: "10px 20px",
-                                        borderRadius: "10px",
-                                        background: "#0d9f6e",
-                                        color: "#fff",
-                                        fontSize: "14px",
-                                        fontWeight: "600",
-                                        textDecoration: "none",
-                                        cursor: "pointer",
-                                        transition: "transform 0.15s",
-                                    }}
-                                >
-                                    Open Page Builder &#8599;
-                                </a>
-                            )}
-                            <button
-                                onClick={dismiss}
-                                style={{
-                                    display: "inline-flex",
-                                    alignItems: "center",
-                                    padding: "10px 16px",
-                                    borderRadius: "10px",
-                                    border: "1px solid #e3e8ee",
-                                    background: "#fff",
-                                    color: "#697386",
-                                    fontSize: "14px",
-                                    fontWeight: "600",
-                                    cursor: "pointer",
-                                    fontFamily: "inherit",
-                                }}
-                            >
-                                Dismiss
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    )
-}
-
-export function ClaudeOverlay() {
-    const status = useStatusPoller()
-    const [phaseIndex, setPhaseIndex] = useState(0)
-    const [visible, setVisible] = useState(false)
-    const [exiting, setExiting] = useState(false)
-    const phaseTimer = useRef(null)
-
-    const isActive = status.state === "working" || status.state === "queued" || status.state === "received"
-    const isCompleted = status.state === "completed"
-    const isError = status.state === "error"
-
-    // Show overlay when active, hide when back to listening
-    useEffect(() => {
-        if (isActive) {
-            setVisible(true)
-            setExiting(false)
-            setPhaseIndex(0)
-        } else if (status.state === "listening" && visible && !exiting) {
-            setExiting(true)
-            setTimeout(() => {
-                setVisible(false)
-                setExiting(false)
-            }, 600)
-        }
-    }, [isActive, status.state])
-
-    useEffect(() => {
-        if (isActive) {
-            phaseTimer.current = setInterval(() => {
-                setPhaseIndex(prev => (prev + 1) % PHASES.length)
-            }, 2800)
-            return () => clearInterval(phaseTimer.current)
-        }
-    }, [isActive])
-
-    useEffect(() => {
-        if (isCompleted && visible) {
-            clearInterval(phaseTimer.current)
-            const timeout = setTimeout(() => {
-                setExiting(true)
-                setTimeout(() => {
-                    setVisible(false)
-                    setExiting(false)
-                }, 600)
-            }, 2000)
-            return () => clearTimeout(timeout)
-        }
-    }, [isCompleted, visible])
-
-    useEffect(() => {
-        if (isError && visible) {
-            clearInterval(phaseTimer.current)
-            const timeout = setTimeout(() => {
-                setExiting(true)
-                setTimeout(() => {
-                    setVisible(false)
-                    setExiting(false)
-                }, 600)
-            }, 3000)
-            return () => clearTimeout(timeout)
-        }
-    }, [isError, visible])
-
-    const phase = PHASES[phaseIndex]
-    const completedMsg = COMPLETED_MESSAGES[Math.floor(Math.random() * COMPLETED_MESSAGES.length)]
-    const displayMessage = status.message || (isCompleted ? completedMsg : isError ? "Something went wrong" : phase.message)
-
-    return (
-        <>
-            {/* Prompt overlay */}
-            {visible && (
-                <div style={{
-                    ...styles.overlay,
-                    opacity: exiting ? 0 : 1,
-                    transition: "opacity 0.6s ease",
-                }}>
-                    <style>{keyframes}</style>
-                    <div style={{
-                        ...styles.dialog,
-                        animation: exiting ? "claude-slideDown 0.5s ease forwards" : "claude-slideIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards",
-                    }}>
-                        <div style={styles.dialogInner}>
-                            {isActive && <PulsingRing />}
-                            {isCompleted && (
-                                <div style={styles.successIcon}>
-                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                        <circle cx="24" cy="24" r="24" fill="#10B981" />
-                                        <path d="M15 24.5L21 30.5L33 18.5" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ strokeDasharray: 30, strokeDashoffset: 0, animation: "claude-checkDraw 0.5s ease 0.2s both" }} />
-                                    </svg>
-                                </div>
-                            )}
-                            {isError && (
-                                <div style={styles.errorIcon}>
-                                    <svg width="48" height="48" viewBox="0 0 48 48" fill="none">
-                                        <circle cx="24" cy="24" r="24" fill="#EF4444" />
-                                        <path d="M17 17L31 31M31 17L17 31" stroke="white" strokeWidth="3" strokeLinecap="round" />
-                                    </svg>
-                                </div>
-                            )}
-                            <div style={styles.messageArea}>
-                                <p style={{
-                                    ...styles.message,
-                                    color: isCompleted ? "#10B981" : isError ? "#EF4444" : "#1a1f36",
-                                }}>
-                                    {displayMessage}
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Deploy overlay */}
-            <DeployOverlay />
-        </>
-    )
-}
-
-const keyframes = `
-@keyframes claude-slideIn {
-    from { opacity: 0; transform: translateY(30px) scale(0.95); }
-    to   { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes claude-slideDown {
-    from { opacity: 1; transform: translateY(0) scale(1); }
-    to   { opacity: 0; transform: translateY(-20px) scale(0.95); }
-}
-@keyframes claude-pulse {
-    0%, 100% { transform: scale(1); opacity: 0.3; }
-    50%      { transform: scale(1.6); opacity: 0; }
-}
-@keyframes claude-pulse2 {
-    0%, 100% { transform: scale(1); opacity: 0.2; }
-    50%      { transform: scale(1.8); opacity: 0; }
-}
-@keyframes claude-pulse3 {
-    0%, 100% { transform: scale(1); opacity: 0.15; }
-    50%      { transform: scale(2); opacity: 0; }
-}
-@keyframes claude-checkDraw {
-    from { stroke-dashoffset: 30; }
-    to   { stroke-dashoffset: 0; }
-}
-`
-
-const deployKeyframes = `
-${keyframes}
-@keyframes deploy-hover {
-    0%, 100% { transform: translateY(2px); }
-    50%      { transform: translateY(-4px); }
-}
-@keyframes deploy-flame {
-    from { transform: scaleY(0.8) scaleX(0.9); }
-    to   { transform: scaleY(1.2) scaleX(1.1); }
-}
-@keyframes deploy-particle {
-    0%   { transform: translateY(0); opacity: 1; }
-    100% { transform: translateY(20px); opacity: 0; }
-}
-@keyframes deploy-glow {
-    from { opacity: 0.3; transform: translateX(-50%) scale(0.9); }
-    to   { opacity: 0.6; transform: translateX(-50%) scale(1.1); }
-}
-@keyframes deploy-shimmer {
-    from { transform: translateX(-100%); }
-    to   { transform: translateX(200%); }
-}
-`
-
-const styles = {
-    overlay: {
-        position: "fixed",
-        inset: 0,
-        zIndex: 999999,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "rgba(15, 23, 42, 0.4)",
-        backdropFilter: "blur(8px)",
-        WebkitBackdropFilter: "blur(8px)",
-    },
-    dialog: {
-        background: "#FFFFFF",
-        borderRadius: "24px",
-        padding: "40px 48px",
-        minWidth: "380px",
-        maxWidth: "440px",
-        boxShadow: "0 25px 60px rgba(0, 0, 0, 0.15), 0 0 0 1px rgba(0, 0, 0, 0.05)",
-        textAlign: "center",
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-    },
-    dialogInner: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "20px",
-    },
-    ringContainer: {
-        position: "relative",
-        width: "80px",
-        height: "80px",
-    },
-    ring: {
-        position: "absolute",
-        inset: 0,
-        borderRadius: "50%",
-        border: "2px solid #635BFF",
-    },
-    ring1: { animation: "claude-pulse 2s ease-in-out infinite" },
-    ring2: { animation: "claude-pulse2 2s ease-in-out 0.4s infinite" },
-    ring3: { animation: "claude-pulse3 2s ease-in-out 0.8s infinite" },
-    ringCenter: {
-        position: "absolute",
-        top: "50%",
-        left: "50%",
-        transform: "translate(-50%, -50%)",
-        width: "48px",
-        height: "48px",
-        borderRadius: "14px",
-        background: "linear-gradient(135deg, #d4a574 0%, #c4956a 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "0 4px 12px rgba(196, 149, 106, 0.3)",
-    },
-    ringLogo: {
-        color: "#fff",
-        fontSize: "20px",
-        fontWeight: "700",
-    },
-    messageArea: {
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        gap: "8px",
-        minHeight: "60px",
-        justifyContent: "center",
-    },
-    message: {
-        fontSize: "16px",
-        fontWeight: "600",
-        margin: 0,
-        lineHeight: 1.4,
-        letterSpacing: "-0.01em",
-        transition: "color 0.3s ease",
-    },
-    successIcon: {
-        animation: "claude-slideIn 0.4s ease",
-    },
-    errorIcon: {
-        animation: "claude-slideIn 0.4s ease",
-    },
-    progressContainer: {
-        width: "100%",
-        display: "flex",
-        alignItems: "center",
-        gap: "12px",
-    },
-    progressTrack: {
-        flex: 1,
-        height: "8px",
-        borderRadius: "4px",
-        background: "#E5E7EB",
-        overflow: "hidden",
-        position: "relative",
-    },
-    progressFill: {
-        height: "100%",
-        borderRadius: "4px",
-        position: "relative",
-        overflow: "hidden",
-    },
-    progressShimmer: {
-        position: "absolute",
-        inset: 0,
-        background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent)",
-        animation: "deploy-shimmer 1.5s ease-in-out infinite",
-    },
-    progressLabel: {
-        fontSize: "13px",
-        fontWeight: "700",
-        color: "#697386",
-        minWidth: "36px",
-        textAlign: "right",
-    },
-}
-```
-
-### component-playground/packages/limio/sdk/index.js
-
-```javascript
-export * from "./src/context"
-
-export function getPropsFromPackageJson(packageData) {
-    const limioProps = packageData.limioProps || []
-    const defaults = {}
-    limioProps.forEach(prop => {
-        if (prop.default !== undefined) {
-            defaults[prop.id] = prop.default
-        }
-    })
-    return defaults
-}
-```
-
-### component-playground/packages/limio/sdk/src/context.js
-
-```javascript
-import * as React from "react"
-
-const LimioContext = React.createContext({})
-export const ComponentContext = React.createContext({})
-
-// ===== Mock Data =====
-
-const mockOffers = [
-    {
-        id: "offer-monthly-001", name: "Monthly Plan", path: "/offers/monthly", type: "item",
-        data: {
-            attributes: {
-                display_name__limio: "Monthly", display_price__limio: "<p>$9.99/mo</p>",
-                detailed_display_price__limio: "<p>Billed monthly</p>", cta_text__limio: "Subscribe",
-                group__limio: "monthly", best_value__limio: false,
-                offer_features__limio: "<ul><li>Unlimited access</li><li>Cancel anytime</li></ul>",
-                payment_types__limio: ["card"], checkout_description__limio: "Monthly subscription",
-                price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }],
-                term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" },
-            },
-            price: [{ value: 9.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
-            products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
-            attachments: []
-        }
-    },
-    {
-        id: "offer-annual-002", name: "Annual Plan", path: "/offers/annual", type: "item",
-        data: {
-            attributes: {
-                display_name__limio: "Annual", display_price__limio: "<p><s>$119.88</s> $99.99/yr</p>",
-                detailed_display_price__limio: "<p>Billed annually — save 17%</p>", cta_text__limio: "Subscribe & Save",
-                group__limio: "annual", best_value__limio: true, badge_text__limio: "Best Value",
-                offer_features__limio: "<ul><li>Unlimited access</li><li>Priority support</li><li>Cancel anytime</li></ul>",
-                payment_types__limio: ["card", "paypal"], checkout_description__limio: "Annual subscription",
-                price__limio: [{ type: "recurring", value: 99.99, currencyCode: "USD" }],
-                term__limio: { type: "years", length: 1, renewal_trigger: "auto", renewal_type: "term" },
-            },
-            price: [{ value: 99.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "years" }],
-            products: [{ path: "/products/standard", name: "Standard", attributes: { display_name__limio: "Standard Plan", product_code__limio: "STANDARD" } }],
-            attachments: []
-        }
-    },
-    {
-        id: "offer-premium-003", name: "Premium Monthly", path: "/offers/premium", type: "item",
-        data: {
-            attributes: {
-                display_name__limio: "Premium", display_price__limio: "<p>$19.99/mo</p>",
-                detailed_display_price__limio: "<p>Billed monthly</p>", cta_text__limio: "Go Premium",
-                group__limio: "monthly", best_value__limio: false,
-                offer_features__limio: "<ul><li>Everything in Standard</li><li>Advanced analytics</li><li>API access</li><li>Dedicated support</li></ul>",
-                payment_types__limio: ["card", "paypal"], checkout_description__limio: "Premium monthly subscription",
-                price__limio: [{ type: "recurring", value: 19.99, currencyCode: "USD" }],
-                term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" },
-            },
-            price: [{ value: 19.99, currencyCode: "USD", type: "recurring", trigger: "subscription_start", repeat_interval: 1, repeat_interval_type: "months" }],
-            products: [{ path: "/products/premium", name: "Premium", attributes: { display_name__limio: "Premium Plan", product_code__limio: "PREMIUM" } }],
-            attachments: []
-        }
-    }
-]
-
-const mockBasketItems = [
-    {
-        name: "Monthly Plan", id: "basket-item-001",
-        offer: mockOffers[0], details: "",
-        price: { summary: { headline: "<p>$9.99/mo</p>" }, currency: "USD", amount: 9.99 },
-        products: mockOffers[0].data.products
-    }
-]
-
-const mockUser = {
-    username: "mock-user-001",
-    attributes: { email: "alex@example.com", email_verified: true, firstName: "Alex", lastName: "Johnson", sub: "mock-user-001" },
-    subscriptions: [
-        {
-            name: "Pro Plan Monthly", status: "active", record_type: "subscription",
-            id: "sub-001", reference: "REF001", created: "2024-01-15T00:00:00Z", mode: "production",
-            offers: [{
-                name: "Pro Plan", quantity: 1,
-                data: {
-                    start: "2024-01-15T00:00:00Z", record_subtype: "base",
-                    offer: {
-                        data: {
-                            attributes: { display_name__limio: "Pro Plan", price__limio: [{ type: "recurring", value: 9.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
-                            products: [{ name: "Pro Access", attributes: { display_name__limio: "Pro Access", product_code__limio: "STANDARD" } }]
-                        }
-                    }
-                },
-                price: { summary: { headline: "$9.99/mo" }, currency: "USD", amount: 9.99 }, products: []
-            }],
-            schedule: [
-                { id: "sched-001", data: { date: "2024-01-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
-                { id: "sched-002", data: { date: "2024-02-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" },
-                { id: "sched-003", data: { date: "2027-07-15T00:00:00Z", amount: "9.99", currency: "USD", type: "payment", description: "Pro Plan — Monthly" }, status: "active" }
-            ]
-        },
-        {
-            name: "Enterprise Annual", status: "active", record_type: "subscription",
-            id: "sub-002", reference: "REF002", created: "2024-03-15T09:30:00Z", mode: "production",
-            offers: [{
-                name: "Enterprise Plan", quantity: 1,
-                data: {
-                    start: "2024-03-15T09:30:00Z", record_subtype: "base",
-                    offer: {
-                        data: {
-                            attributes: { display_name__limio: "Enterprise Plan", price__limio: [{ type: "recurring", value: 499, currencyCode: "USD" }], term__limio: { type: "years", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
-                            products: [{ name: "Enterprise Access", attributes: { display_name__limio: "Enterprise Access", product_code__limio: "ENTERPRISE" } }]
-                        }
-                    }
-                },
-                price: { summary: { headline: "$499/year" }, currency: "USD", amount: 499 }, products: []
-            }],
-            schedule: [
-                { id: "sched-010", data: { date: "2024-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" },
-                { id: "sched-011", data: { date: "2027-03-15T09:30:00Z", amount: "499.00", currency: "USD", type: "payment", description: "Enterprise Plan — Annual" }, status: "active" }
-            ]
-        },
-        {
-            name: "Starter Monthly", status: "cancelled", record_type: "subscription",
-            id: "sub-003", reference: "REF003", created: "2023-06-01T08:00:00Z", mode: "production",
-            offers: [{
-                name: "Starter Plan", quantity: 1,
-                data: {
-                    start: "2023-06-01T08:00:00Z", end: "2023-12-01T08:00:00Z", record_subtype: "base",
-                    offer: {
-                        data: {
-                            attributes: { display_name__limio: "Starter Plan", price__limio: [{ type: "recurring", value: 4.99, currencyCode: "USD" }], term__limio: { type: "months", length: 1, renewal_trigger: "auto", renewal_type: "term" } },
-                            products: [{ name: "Starter Access", attributes: { display_name__limio: "Starter Access", product_code__limio: "STARTER" } }]
-                        }
-                    }
-                },
-                price: { summary: { headline: "$4.99/mo" }, currency: "USD", amount: 4.99 }, products: []
-            }],
-            schedule: [
-                { id: "sched-020", data: { date: "2023-06-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "active" },
-                { id: "sched-021", data: { date: "2023-11-01T08:00:00Z", amount: "4.99", currency: "USD", type: "payment", description: "Starter Plan — Monthly" }, status: "cancelled" }
-            ]
-        }
-    ],
-    loginStatus: "logged-in", loaded: true, token: "mock-jwt-token"
-}
-
-const dummyContext = {
-    pageBuilder__limio: false,
-    shop: {
-        campaign: { name: "Demo Campaign", path: "/campaigns/demo", attributes: { push_to_checkout__limio: true } },
-        offers: mockOffers,
-        addOns: [],
-        tag: "/tags/demo",
-        basketItems: mockBasketItems,
-        addToBasket: (offer) => console.log("Added to basket:", offer),
-    },
-    user: mockUser
-}
-
-// ===== Hooks =====
-
-export function useCampaign() {
-    React.useContext(LimioContext)
-    const { campaign, offers, addOns } = dummyContext.shop
-    return { campaign, offers, addOns }
-}
-
-export function useBasket() {
-    React.useContext(LimioContext)
-    const { basketItems, addToBasket } = dummyContext.shop
-    return {
-        orderItems: basketItems, basketLoading: false, formattedTotal: "$9.99",
-        initiateCheckout: async (data) => console.log("Checkout initiated:", data),
-        addOfferToBasket: async (data) => console.log("Added:", data),
-        removeFromBasket: async (data) => console.log("Removed:", data),
-        navigateToCheckout: async () => console.log("Navigate to checkout"),
-        clearOrderItems: () => console.log("Cart cleared"),
-    }
-}
-
-export function useUser() {
-    React.useContext(LimioContext)
-    return mockUser
-}
-
-export function useSubscriptions() {
-    React.useContext(LimioContext)
-    return { subscriptions: mockUser.subscriptions }
-}
-
-export function useLimioContext() {
-    React.useContext(LimioContext)
-    return { isInPageBuilder: false }
-}
-
-export function useComponentProps(defaultProps) {
-    const context = React.useContext(ComponentContext)
-    return React.useMemo(() => ({ ...defaultProps, ...context }), [context, defaultProps])
-}
-
-export function useCheckout() {
-    return {
-        useCheckoutSelector: (callback) => callback({
-            order: { orderDate: new Date().toISOString(), basketItems: mockBasketItems, orderItems: mockBasketItems, customerDetails: { firstName: "Alex", lastName: "Johnson", email: "alex@example.com" } },
-            display: { orderTotal: { orderSubtotal: "$9.99", orderTotal: "$9.99", currency: "USD", taxSummary: [] } }
-        })
-    }
-}
-
-export function groupOffers(offers = [], groupLabels = []) {
-    const groups = {}
-    for (const offer of offers) {
-        const group = offer?.data?.attributes?.group__limio || "other"
-        groups[group] = groups[group] || []
-        groups[group].push(offer)
-    }
-    return Object.keys(groups).map(groupId => {
-        const match = groupLabels.find(g => g.id === groupId) || { id: groupId, label: groupId, thumbnail: "" }
-        return { groupId, id: groupId, label: match.label, offers: groups[groupId], thumbnail: match.thumbnail }
-    })
-}
-
-export function formatCurrencyForCurrentLocale(amount, currency) {
-    return new Intl.NumberFormat("en-US", { style: "currency", currency }).format(amount)
-}
-
-export function ErrorBoundary({ children }) {
-    return <>{children}</>
-}
-
-// ===== Provider =====
-
-export function LimioProvider({ children, value = dummyContext }) {
-    return <LimioContext.Provider value={value}>{children}</LimioContext.Provider>
-}
-```
-
-### component-playground/packages/limio/shop/src/shop/checkout/basket.js
-
-```javascript
-export function getCurrentBasketId() {
-    return "mock-basket-id"
-}
-```
-
-### component-playground/packages/limio/internal-checkout-sdk/index.js
-
-```javascript
-import { useCheckout } from "@limio/sdk"
-export { useCheckout }
-```
-
-After creating all files, install dependencies:
-```bash
-cd component-playground && npm install
-```
+## Troubleshooting
+
+| Issue | Cause | Fix |
+|-------|-------|-----|
+| Imports not resolving | Missing webpack aliases | Ensure `main.js` has aliases for `@limio/sdk`, `@limio/shop`, `@limio/internal-checkout-sdk` |
+| SDK hooks return undefined | Hook not mocked in SDK mock | Check `packages/limio/sdk/src/context.js` has the hook exported |
+| `sanitiseHTML` not found | Not mocked in Storybook SDK | Use `xss` npm package as fallback in components, or add mock to SDK |
+| Component breaks in Storybook | Importing from `../source/utils/` | Make component self-contained; use SDK utilities or inline helpers |
+| `position: fixed` breaks Page Builder | No Page Builder fallback | Check `isInPageBuilder` from `useLimioContext()` and use `position: relative` |
+| `.limio.json` in git status | Not gitignored | Add `.limio.json` to root `.gitignore` immediately |
+| MUI styles broken | Wrong MUI version | Pin `@mui/material` to `5.16.12` |
+| List prop values incorrect | Using plain strings | List items must be `{id, label}` objects |
 
 ---
 
-## Claude Prompt Addon (Create or Update)
-
-If `component-playground/.storybook/addon-prompt/manager.js` does **not** exist, create the Claude Prompt addon. If it exists but is outdated (see "Addon Version Checking" below), replace both `manager.js` and `middleware.js` with the current templates. This adds a panel to Storybook where users can type prompts that Claude Code picks up and processes automatically.
-
-### Addon Version Checking
-
-When the addon already exists, check these markers to determine if it needs updating:
-
-| Feature | File | Marker |
-|---------|------|--------|
-| Settings panel | manager.js | `SETTINGS_PANEL_ID` |
-| Deploy endpoint | middleware.js | `/api/deploy` |
-| Limio config | middleware.js | `readLimioConfig` |
-| Build status | middleware.js | `/api/build-status` |
-| Loading overlay | claude-overlay.js | `ClaudeOverlay` |
-| New component tool | src/stories/NewComponent.stories.js | `Tools/New Component` |
-| Overlay decorator | preview.js | `ClaudeOverlay` |
-| Deploy overlay | claude-overlay.js | `DeployOverlay` |
-| Deploy status endpoint | middleware.js | `/api/deploy-overlay` |
-| Smart deploy (pull/rebase) | middleware.js | `smart-deploy` |
-| Credential safety | root .gitignore | `.limio.json` |
-
-If **any** marker is missing from its respective file, replace **both** `manager.js` and `middleware.js` with the current templates below. If `claude-overlay.js` is missing, create it and update `preview.js`. If `NewComponent.stories.js` is missing, create it. If `.limio.json` is not in the root `.gitignore`, add it immediately. This ensures all features stay in sync.
-
-### How it works
-
-1. User types a prompt in the Storybook "Claude Prompt" panel and clicks "Send to Claude"
-2. Storybook's Express middleware writes the prompt to `component-playground/.prompt.json`
-3. The watcher script (`scripts/watch-prompts.js`) detects the change and exits
-4. Claude Code gets notified, reads the prompt, applies changes to the component
-5. Storybook hot-reloads with the updated component
-
-### component-playground/.storybook/middleware.js
-
-```javascript
-const fs = require("fs")
-const path = require("path")
-const { execSync } = require("child_process")
-
-const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
-const STATUS_FILE = path.resolve(__dirname, "..", ".prompt-status.json")
-const DEPLOY_STATUS_FILE = path.resolve(__dirname, "..", ".deploy-status.json")
-const PROJECT_ROOT = path.resolve(__dirname, "..", "..")
-const CONFIG_FILE = path.join(PROJECT_ROOT, ".limio.json")
-
-// --- Limio config + token management ---
-
-function readLimioConfig() {
-    try {
-        if (!fs.existsSync(CONFIG_FILE)) return null
-        const raw = JSON.parse(fs.readFileSync(CONFIG_FILE, "utf8"))
-        if (!raw.tenant || !raw.clientId || !raw.clientSecret) return null
-        return raw
-    } catch {
-        return null
-    }
-}
-
-function getLimioBaseUrl(config) {
-    const region = (config.region || "eu").toLowerCase()
-    if (region === "us") return `https://${config.tenant}.prod-us.limio.com`
-    if (region === "dev") return `https://${config.tenant}.dev.limio.com`
-    return `https://${config.tenant}.prod.limio.com`
-}
-
-let tokenCache = { token: null, expiresAt: 0 }
-
-function invalidateToken() {
-    tokenCache = { token: null, expiresAt: 0 }
-}
-
-async function getAccessToken(config, forceRefresh) {
-    const now = Date.now()
-    if (!forceRefresh && tokenCache.token && tokenCache.expiresAt > now + 60000) {
-        return tokenCache.token
-    }
-    const baseUrl = getLimioBaseUrl(config)
-    const params = new URLSearchParams({
-        grant_type: "client_credentials",
-        client_id: config.clientId,
-        client_secret: config.clientSecret,
-    })
-    const res = await fetch(`${baseUrl}/oauth2/token`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: params.toString(),
-    })
-    if (!res.ok) {
-        const text = await res.text().catch(() => "")
-        throw new Error(`Auth failed (${res.status}): ${text}`)
-    }
-    const data = await res.json()
-    tokenCache = {
-        token: data.access_token,
-        expiresAt: now + (data.expires_in || 3600) * 1000,
-    }
-    return tokenCache.token
-}
-
-async function limioApiFetch(config, url, options) {
-    let token = await getAccessToken(config)
-    let res = await fetch(url, { ...options, headers: { ...options?.headers, Authorization: `Bearer ${token}` } })
-    if (res.status === 401) {
-        token = await getAccessToken(config, true)
-        res = await fetch(url, { ...options, headers: { ...options?.headers, Authorization: `Bearer ${token}` } })
-    }
-    return res
-}
-
-// --- Helpers ---
-
-function readBody(req) {
-    return new Promise((resolve) => {
-        let body = ""
-        req.on("data", chunk => { body += chunk })
-        req.on("end", () => {
-            try { resolve(JSON.parse(body)) } catch { resolve({}) }
-        })
-    })
-}
-
-function sendJson(res, statusCode, data) {
-    res.statusCode = statusCode
-    res.setHeader("Content-Type", "application/json")
-    res.end(JSON.stringify(data))
-}
-
-module.exports = function expressMiddleware(app) {
-    // Auto-reset stale prompt status from interrupted sessions
-    try {
-        if (fs.existsSync(STATUS_FILE)) {
-            const status = JSON.parse(fs.readFileSync(STATUS_FILE, "utf8"))
-            if (["queued", "received", "working"].includes(status.state)) {
-                fs.writeFileSync(STATUS_FILE, JSON.stringify(
-                    { state: "listening", message: "", timestamp: new Date().toISOString() }, null, 2
-                ))
-            }
-        }
-    } catch {}
-
-    app.use("/api/prompt", async (req, res, next) => {
-        if (req.method === "POST") {
-            const body = await readBody(req)
-            const { prompt, component, storyId, mode } = body
-            if (!prompt) return sendJson(res, 400, { error: "prompt is required" })
-            const data = { prompt, component: component || "unknown", storyId: storyId || "", mode: mode || "edit", timestamp: new Date().toISOString() }
-            try {
-                fs.writeFileSync(PROMPT_FILE, JSON.stringify(data, null, 2))
-                const statusData = { state: "queued", message: "Prompt sent — waiting for Claude Code...", timestamp: new Date().toISOString() }
-                fs.writeFileSync(STATUS_FILE, JSON.stringify(statusData, null, 2))
-                sendJson(res, 200, { success: true })
-            } catch (err) {
-                console.error("Error writing prompt:", err)
-                sendJson(res, 500, { error: err.message })
-            }
-        } else if (req.method === "GET") {
-            try {
-                if (fs.existsSync(PROMPT_FILE)) {
-                    sendJson(res, 200, JSON.parse(fs.readFileSync(PROMPT_FILE, "utf8")))
-                } else {
-                    sendJson(res, 200, { prompt: "", component: "", storyId: "", timestamp: "" })
-                }
-            } catch { sendJson(res, 200, { prompt: "", component: "", storyId: "", timestamp: "" }) }
-        } else {
-            next()
-        }
-    })
-
-    app.use("/api/prompt-status", async (req, res, next) => {
-        if (req.method === "POST") {
-            const body = await readBody(req)
-            const { state, message } = body
-            if (!state) return sendJson(res, 400, { error: "state is required" })
-            try {
-                const data = { state, message: message || "", timestamp: new Date().toISOString() }
-                fs.writeFileSync(STATUS_FILE, JSON.stringify(data, null, 2))
-                sendJson(res, 200, { success: true })
-            } catch (err) {
-                sendJson(res, 500, { error: err.message })
-            }
-        } else if (req.method === "GET") {
-            try {
-                if (fs.existsSync(STATUS_FILE)) {
-                    sendJson(res, 200, JSON.parse(fs.readFileSync(STATUS_FILE, "utf8")))
-                } else {
-                    sendJson(res, 200, { state: "listening", message: "" })
-                }
-            } catch { sendJson(res, 200, { state: "listening", message: "" }) }
-        } else {
-            next()
-        }
-    })
-
-    // --- smart-deploy: fetches, pulls/rebases if behind, handles conflicts ---
-    app.use("/api/deploy", async (req, res, next) => {
-        if (req.method === "POST") {
-            const body = await readBody(req)
-            const { component } = body
-            if (!component) return sendJson(res, 400, { error: "component is required" })
-
-            const exec = (cmd) => execSync(cmd, { cwd: PROJECT_ROOT, encoding: "utf8", timeout: 30000 }).trim()
-            const steps = []
-
-            try {
-                // 1. Validate component exists
-                const componentDir = path.join("components", component)
-                const componentPath = path.join(PROJECT_ROOT, componentDir)
-                if (!fs.existsSync(componentPath)) {
-                    return sendJson(res, 400, { error: `Component folder not found: ${componentDir}` })
-                }
-
-                // 2. Get current branch and check tracking
-                const branch = exec("git rev-parse --abbrev-ref HEAD")
-                let hasUpstream = false
-                try {
-                    exec(`git rev-parse --abbrev-ref ${branch}@{upstream}`)
-                    hasUpstream = true
-                } catch {}
-                steps.push(`branch: ${branch}, upstream: ${hasUpstream}`)
-
-                // 3. Fetch remote
-                if (hasUpstream) {
-                    try { exec("git fetch origin"); steps.push("fetched origin") } catch (err) { steps.push(`fetch warning: ${err.message}`) }
-                }
-
-                // 4. Check ahead/behind
-                let behind = 0, ahead = 0
-                if (hasUpstream) {
-                    try {
-                        const counts = exec(`git rev-list --left-right --count ${branch}...origin/${branch}`)
-                        const parts = counts.split(/\s+/)
-                        ahead = parseInt(parts[0], 10) || 0
-                        behind = parseInt(parts[1], 10) || 0
-                        steps.push(`ahead: ${ahead}, behind: ${behind}`)
-                    } catch { steps.push("could not determine ahead/behind") }
-                }
-
-                // 5. If behind, stash → pull --rebase → pop
-                let didStash = false
-                if (behind > 0) {
-                    const dirtyStatus = exec("git status --porcelain")
-                    if (dirtyStatus.length > 0) {
-                        exec("git stash push -m \"deploy-auto-stash\" --include-untracked")
-                        didStash = true
-                        steps.push("stashed uncommitted changes")
-                    }
-                    try {
-                        exec("git pull --rebase origin " + branch)
-                        steps.push("pulled and rebased")
-                    } catch (pullErr) {
-                        try { exec("git rebase --abort") } catch {}
-                        if (didStash) { try { exec("git stash pop") } catch {} }
-                        return sendJson(res, 409, { error: "Merge conflict while pulling remote changes. Please resolve manually.", details: pullErr.message, steps })
-                    }
-                    if (didStash) {
-                        try { exec("git stash pop"); steps.push("restored stashed changes") } catch (popErr) {
-                            return sendJson(res, 409, { error: "Pulled successfully but local changes conflict with remote. Run 'git stash pop' and resolve.", details: popErr.message, steps })
-                        }
-                    }
-                }
-
-                // 6. Stage component + related stories
-                exec(`git add ${componentDir}/`)
-                steps.push(`staged ${componentDir}/`)
-                const storiesDir = path.join(PROJECT_ROOT, "component-playground", "src", "stories")
-                if (fs.existsSync(storiesDir)) {
-                    const storyFiles = fs.readdirSync(storiesDir).filter(f => f.endsWith(".stories.js") || f.endsWith(".stories.jsx"))
-                    for (const file of storyFiles) {
-                        const content = fs.readFileSync(path.join(storiesDir, file), "utf8")
-                        if (content.includes(component)) {
-                            exec(`git add component-playground/src/stories/${file}`)
-                            steps.push(`staged story: ${file}`)
-                        }
-                    }
-                }
-
-                // 7. Check for no-op
-                const staged = exec("git diff --cached --name-only")
-                if (!staged) {
-                    return sendJson(res, 200, { success: true, message: `No changes to deploy for ${component} — already up to date`, steps, noChanges: true })
-                }
-
-                // 8. Commit + push (with retry)
-                exec(`git commit -m "Deploy component: ${component}"`)
-                const commitHash = exec("git rev-parse HEAD")
-                steps.push(`committed: ${commitHash.substring(0, 8)}`)
-
-                const pushCmd = hasUpstream ? "git push" : `git push -u origin ${branch}`
-                try {
-                    exec(pushCmd)
-                    steps.push("pushed")
-                } catch (pushErr) {
-                    steps.push(`push failed, retrying: ${pushErr.message}`)
-                    try {
-                        exec("git pull --rebase origin " + branch)
-                        exec(pushCmd)
-                        steps.push("retried pull --rebase + push: success")
-                    } catch (retryErr) {
-                        try { exec("git rebase --abort") } catch {}
-                        return sendJson(res, 409, { error: "Push failed after retry. Remote may have conflicting changes.", details: retryErr.message, steps, commitHash })
-                    }
-                }
-
-                sendJson(res, 200, { success: true, message: `Deployed ${component} successfully`, commitHash, steps, pulled: behind > 0 })
-            } catch (err) {
-                console.error("Deploy error:", err.message)
-                sendJson(res, 500, { error: err.message, steps })
-            }
-        } else if (req.method === "GET") {
-            try {
-                const branch = execSync("git rev-parse --abbrev-ref HEAD", { cwd: PROJECT_ROOT }).toString().trim()
-                const status = execSync("git status --porcelain", { cwd: PROJECT_ROOT }).toString().trim()
-                let ahead = 0, behind = 0
-                try {
-                    const counts = execSync(`git rev-list --left-right --count ${branch}...origin/${branch}`, { cwd: PROJECT_ROOT, encoding: "utf8" }).trim()
-                    const parts = counts.split(/\s+/)
-                    ahead = parseInt(parts[0], 10) || 0
-                    behind = parseInt(parts[1], 10) || 0
-                } catch {}
-                sendJson(res, 200, { branch, clean: status.length === 0, status, ahead, behind })
-            } catch (err) {
-                sendJson(res, 500, { error: err.message })
-            }
-        } else {
-            next()
-        }
-    })
-
-    // --- Limio connection status ---
-    app.use("/api/limio/status", async (req, res, next) => {
-        if (req.method !== "GET") return next()
-        const config = readLimioConfig()
-        if (!config) return sendJson(res, 200, { configured: false })
-        try {
-            await getAccessToken(config)
-            sendJson(res, 200, { configured: true, tenant: config.tenant, region: config.region || "eu", baseUrl: getLimioBaseUrl(config) })
-        } catch (err) {
-            sendJson(res, 200, { configured: false, error: `Credentials invalid: ${err.message}` })
-        }
-    })
-
-    // --- Save Limio credentials ---
-    app.use("/api/limio/setup", async (req, res, next) => {
-        if (req.method !== "POST") return next()
-        const body = await readBody(req)
-        const { tenant, region, clientId, clientSecret } = body
-        if (!tenant || !clientId || !clientSecret) {
-            return sendJson(res, 400, { error: "tenant, clientId, and clientSecret are required" })
-        }
-        const config = { tenant, region: region || "eu", clientId, clientSecret }
-        try {
-            invalidateToken()
-            await getAccessToken(config, true)
-        } catch (err) {
-            return sendJson(res, 400, { error: `Authentication failed: ${err.message}` })
-        }
-        try {
-            fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2))
-            sendJson(res, 200, { success: true, tenant, region: config.region, baseUrl: getLimioBaseUrl(config) })
-        } catch (err) {
-            sendJson(res, 500, { error: `Failed to save config: ${err.message}` })
-        }
-    })
-
-    // --- Build status proxy ---
-    // Fetches the latest build from Limio. If deployedAfter is provided,
-    // only considers builds that started after that timestamp (handles
-    // GH→CodeCommit mirroring where local commit hashes don't match).
-    app.use("/api/build-status", async (req, res, next) => {
-        if (req.method !== "GET") return next()
-        const url = new URL(req.url, "http://localhost")
-        const deployedAfter = url.searchParams.get("deployedAfter")
-        const config = readLimioConfig()
-        if (!config) return sendJson(res, 400, { error: "Limio not configured" })
-        try {
-            const baseUrl = getLimioBaseUrl(config)
-            const apiRes = await limioApiFetch(config, `${baseUrl}/api/component/builds`)
-            if (!apiRes.ok) {
-                const text = await apiRes.text().catch(() => "")
-                return sendJson(res, apiRes.status, { found: false, error: `Limio API error (${apiRes.status}): ${text}` })
-            }
-            const data = await apiRes.json()
-            if (!data) {
-                return sendJson(res, 200, { found: false })
-            }
-            const build = Array.isArray(data) ? data[0] : data
-            if (!build || !build.startTime) {
-                return sendJson(res, 200, { found: false })
-            }
-            // If deployedAfter is set, only match builds that started after the deploy
-            if (deployedAfter) {
-                const buildStart = new Date(build.startTime).getTime()
-                const deployTime = new Date(deployedAfter).getTime()
-                if (buildStart < deployTime) {
-                    return sendJson(res, 200, { found: false })
-                }
-            }
-            sendJson(res, 200, {
-                found: true,
-                buildStatus: build.status || build.buildStatus || "UNKNOWN",
-                buildComplete: ["SUCCEEDED", "FAILED", "ERROR"].includes((build.status || build.buildStatus || "").toUpperCase()),
-                logErrors: build.logErrors || build.errors || null,
-                startTime: build.startTime || build.createdAt || null,
-                endTime: build.endTime || build.completedAt || null,
-            })
-        } catch (err) {
-            sendJson(res, 500, { error: err.message })
-        }
-    })
-
-    // --- Deploy overlay status ---
-    app.use("/api/deploy-overlay", async (req, res, next) => {
-        if (req.method === "POST") {
-            const body = await readBody(req)
-            const { state, message, component, progress } = body
-            if (!state) return sendJson(res, 400, { error: "state is required" })
-            try {
-                const data = { state, message: message || "", component: component || "", progress: progress || 0, timestamp: new Date().toISOString() }
-                fs.writeFileSync(DEPLOY_STATUS_FILE, JSON.stringify(data, null, 2))
-                sendJson(res, 200, { success: true })
-            } catch (err) {
-                sendJson(res, 500, { error: err.message })
-            }
-        } else if (req.method === "GET") {
-            try {
-                if (fs.existsSync(DEPLOY_STATUS_FILE)) {
-                    sendJson(res, 200, JSON.parse(fs.readFileSync(DEPLOY_STATUS_FILE, "utf8")))
-                } else {
-                    sendJson(res, 200, { state: "idle", message: "", component: "", progress: 0 })
-                }
-            } catch { sendJson(res, 200, { state: "idle", message: "", component: "", progress: 0 }) }
-        } else {
-            next()
-        }
-    })
-}
-```
-
-### component-playground/.storybook/addon-prompt/preset.js
-
-```javascript
-module.exports = {
-    managerEntries(entry = []) {
-        return [...entry, require.resolve("./manager")]
-    },
-}
-```
-
-### component-playground/.storybook/addon-prompt/manager.js
-
-The manager.js file registers two panels: **Claude Prompt** (for sending prompts) and **Limio Settings** (for configuring Limio credentials). It includes real-time backend status polling, deploy functionality with Limio build tracking, and the Limio connection settings form. The deploy flow now posts status updates to `/api/deploy-overlay` for the overlay to display.
-
-The full file is extensive (~540 lines). Key features to include when creating it:
-
-- **PromptPanel** — textarea + send button, real-time backend status polling (`/api/prompt-status`), deploy button with build status tracking, `+ New` button to navigate to new-component story
-- **SettingsPanel** — Limio credential form with tenant, region (EU/US/Dev), client ID, client secret; URL preview that shows the correct domain per region; connects via `/api/limio/setup`
-- **Region dropdown** must include all three options:
-  ```jsx
-  <option value="eu">EU (Europe)</option>
-  <option value="us">US (United States)</option>
-  <option value="dev">Dev (Development)</option>
-  ```
-- **URL preview** must handle all three regions:
-  ```jsx
-  {region === "us" ? `${tenant}.prod-us.limio.com` : region === "dev" ? `${tenant}.dev.limio.com` : `${tenant}.prod.limio.com`}
-  ```
-- **Registration:** `addons.register` with both `PANEL_ID` (Claude Prompt) and `SETTINGS_PANEL_ID` (Limio Settings)
-
-Use the actual file at `component-playground/.storybook/addon-prompt/manager.js` as the source of truth — it evolves faster than this template.
-
-### component-playground/scripts/watch-prompts.js
-
-```javascript
-const fs = require("fs")
-const path = require("path")
-
-const PROMPT_FILE = path.resolve(__dirname, "..", ".prompt.json")
-
-if (!fs.existsSync(PROMPT_FILE)) {
-    fs.writeFileSync(PROMPT_FILE, JSON.stringify({ prompt: "", component: "", storyId: "", timestamp: "" }, null, 2))
-}
-
-const initialContent = fs.readFileSync(PROMPT_FILE, "utf8")
-const initialTimestamp = JSON.parse(initialContent).timestamp || ""
-
-console.log("Watching for prompts from Storybook...")
-console.log(`Prompt file: ${PROMPT_FILE}`)
-
-const check = () => {
-    try {
-        const content = fs.readFileSync(PROMPT_FILE, "utf8")
-        const data = JSON.parse(content)
-        if (data.timestamp && data.timestamp !== initialTimestamp && data.prompt) {
-            console.log("\n===PROMPT_RECEIVED===")
-            console.log(JSON.stringify(data, null, 2))
-            console.log("===END_PROMPT===")
-            process.exit(0)
-        }
-    } catch {}
-}
-
-const interval = setInterval(check, 500)
-process.on("SIGINT", () => { clearInterval(interval); process.exit(0) })
-process.on("SIGTERM", () => { clearInterval(interval); process.exit(0) })
-```
-
-### Register the addon in main.js
-
-Add `path.resolve(__dirname, "addon-prompt")` to the `addons` array in `.storybook/main.js` (see the main.js template above which already includes it).
-
-### Update `.gitignore` files
-
-**Root `.gitignore`** — ensure `.limio.json` is listed (contains OAuth credentials — NEVER commit):
-```
-.limio.json
-```
-
-**`component-playground/.gitignore`** — append transient files:
-```
-.prompt.json
-.prompt-status.json
-.deploy-status.json
-```
-
----
-
-## Prompt Watcher Workflow
-
-After starting Storybook, start the prompt watcher as a **background task**:
-
-```bash
-node component-playground/scripts/watch-prompts.js
-```
-
-When the watcher exits (a prompt was received from the Storybook panel):
-
-1. **Update status to "working":**
-   ```bash
-   node component-playground/scripts/update-prompt-status.js working "Reading component files..."
-   ```
-2. **Read the prompt file:** `component-playground/.prompt.json`
-3. **Parse the JSON** — it contains `{ prompt, component, storyId, timestamp }`
-4. **Read the target component files:** `components/<component>/index.js`, `index.css`, `package.json`
-5. **Update status as you work:**
-   ```bash
-   node component-playground/scripts/update-prompt-status.js working "Applying changes to <component>..."
-   ```
-6. **Apply the requested changes** to the component based on the prompt
-7. **Update status to "completed":**
-   ```bash
-   node component-playground/scripts/update-prompt-status.js completed "Changes applied — check Storybook"
-   ```
-8. **Restart the watcher** as a new background task to listen for the next prompt
-
-If you need user input or permission:
-```bash
-node component-playground/scripts/update-prompt-status.js permission_needed "Need approval to modify package.json dependencies"
-```
-
-If something goes wrong:
-```bash
-node component-playground/scripts/update-prompt-status.js error "Could not find component 'foo'"
-```
-
-### Status States
-
-| State | Shown as | Meaning |
-|-------|----------|---------|
-| `listening` | Green "Listening" badge | Watcher is running, ready for prompts |
-| `queued` | Yellow banner | Prompt saved, waiting for watcher to pick up |
-| `received` | Purple banner | Watcher picked up the prompt |
-| `working` | Purple banner + message | Claude Code is actively making changes |
-| `permission_needed` | Yellow banner | Claude Code needs user input |
-| `completed` | Green banner | Changes applied successfully |
-| `error` | Red banner | Something went wrong |
-
-### Status Update Script
-
-```bash
-node component-playground/scripts/update-prompt-status.js <state> <message>
-```
-
-The prompt file format:
-```json
-{
-    "prompt": "Make the hero section taller and change the gradient to blue-to-green",
-    "component": "win-back",
-    "storyId": "win-back--default",
-    "timestamp": "2025-01-15T10:30:00.000Z"
-}
-```
-
-**Important:** After processing a prompt, always update the status to "completed" and restart the watcher script so the next prompt can be captured.
-
----
-
-## Limio Setup Story (One-time)
-
-If `component-playground/src/stories/LimioSetup.stories.js` does **not** exist, create it. This provides a guided onboarding wizard at **Tools > Limio Setup** in the Storybook sidebar.
-
-The wizard has three steps:
-1. **Welcome** — branded header + "Get Started" button
-2. **Enter Credentials** — form with tenant, region (EU/US/Dev), client ID, client secret; live URL preview; POSTs to `/api/limio/setup`
-3. **Connected** — success confirmation with "Build a Component" and "Browse Components" action buttons
-
-On mount it auto-detects existing config via `GET /api/limio/status` and skips to Step 3 if already configured.
-
-Use the actual file at `component-playground/src/stories/LimioSetup.stories.js` as the source of truth.
-
----
-
-## New Component Builder (One-time)
-
-If `component-playground/src/stories/NewComponent.stories.js` does **not** exist, create it. This provides a dedicated page at **Tools > New Component** in the Storybook sidebar where users can name a component, describe what they want, and submit it to Claude Code for creation.
-
-The `+ New` button in the Claude Prompt panel header also navigates to this page.
-
-### component-playground/src/stories/NewComponent.stories.js
-
-```javascript
-import React, { useState, useEffect, useCallback, useRef } from "react"
-
-const toKebabCase = (str) =>
-    str
-        .replace(/([a-z])([A-Z])/g, "$1-$2")
-        .replace(/[\s_]+/g, "-")
-        .replace(/[^a-z0-9-]/gi, "")
-        .toLowerCase()
-
-const BuilderPage = () => {
-    const [componentName, setComponentName] = useState("")
-    const [prompt, setPrompt] = useState("")
-    const [submitting, setSubmitting] = useState(false)
-    const [submitted, setSubmitted] = useState(false)
-    const [error, setError] = useState(null)
-    const [prefilled, setPrefilled] = useState(false)
-    const textareaRef = useRef(null)
-
-    // Prefill from .prompt.json on mount
-    useEffect(() => {
-        const prefill = async () => {
-            try {
-                const res = await fetch("/api/prompt")
-                if (!res.ok) return
-                const data = await res.json()
-                if (data.mode === "create" && data.prompt) {
-                    setPrompt(data.prompt)
-                    if (data.component && data.component !== "unknown") {
-                        setComponentName(data.component)
-                    }
-                    setPrefilled(true)
-                }
-            } catch {}
-        }
-        prefill()
-    }, [])
-
-    const kebab = toKebabCase(componentName)
-
-    const handleSubmit = useCallback(async () => {
-        if (!componentName.trim() || !prompt.trim() || submitting) return
-        setSubmitting(true)
-        setError(null)
-        try {
-            const res = await fetch("/api/prompt", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    prompt: prompt.trim(),
-                    component: kebab || componentName.trim(),
-                    storyId: "tools-new-component--builder",
-                    mode: "create",
-                }),
-            })
-            if (res.ok) {
-                setSubmitted(true)
-            } else {
-                const data = await res.json().catch(() => ({}))
-                setError(data.error || "Failed to send prompt")
-                setSubmitting(false)
-            }
-        } catch (err) {
-            setError("Connection error — is Storybook middleware running?")
-            setSubmitting(false)
-        }
-    }, [componentName, prompt, kebab, submitting])
-
-    const handleKeyDown = useCallback(
-        (e) => {
-            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                e.preventDefault()
-                handleSubmit()
-            }
-        },
-        [handleSubmit]
-    )
-
-    const handleReset = () => {
-        setComponentName("")
-        setPrompt("")
-        setSubmitting(false)
-        setSubmitted(false)
-        setError(null)
-        setPrefilled(false)
-        // Reset status to listening
-        fetch("/api/prompt-status", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ state: "listening", message: "" }),
-        }).catch(() => {})
-    }
-
-    const isDisabled = submitting || submitted
-
-    return (
-        <div style={s.page}>
-            <div style={s.card}>
-                <div style={s.header}>
-                    <div style={s.logo}>C</div>
-                    <div>
-                        <h1 style={s.title}>New Component</h1>
-                        <p style={s.subtitle}>
-                            Describe what you want and Claude will build it.
-                        </p>
-                    </div>
-                </div>
-
-                {prefilled && !submitted && (
-                    <div style={s.prefillBanner}>
-                        <span style={{ fontSize: "13px" }}>&#9889;</span>
-                        <span>Pre-filled from your last prompt</span>
-                    </div>
-                )}
-
-                {submitted && (
-                    <div style={s.successBanner}>
-                        <span style={{ fontSize: "14px" }}>&#10003;</span>
-                        <span>
-                            Prompt sent — Claude Code is building{" "}
-                            <strong>{kebab || componentName}</strong>. Watch the
-                            overlay for progress.
-                        </span>
-                    </div>
-                )}
-
-                {error && (
-                    <div style={s.errorBanner}>
-                        <span style={{ fontSize: "14px" }}>&#10007;</span>
-                        <span>{error}</span>
-                    </div>
-                )}
-
-                <div style={s.field}>
-                    <label style={s.label}>Component Name</label>
-                    <input
-                        style={{
-                            ...s.input,
-                            ...(isDisabled ? { opacity: 0.5 } : {}),
-                        }}
-                        type="text"
-                        value={componentName}
-                        onChange={(e) => setComponentName(e.target.value)}
-                        placeholder='e.g. "Pricing Table" or "Hero Banner"'
-                        disabled={isDisabled}
-                    />
-                    {componentName && (
-                        <div style={s.kebabPreview}>
-                            <span style={s.kebabLabel}>folder:</span>
-                            <code style={s.kebabValue}>
-                                components/{kebab}/
-                            </code>
-                        </div>
-                    )}
-                </div>
-
-                <div style={s.field}>
-                    <label style={s.label}>Prompt</label>
-                    <textarea
-                        ref={textareaRef}
-                        style={{
-                            ...s.textarea,
-                            ...(isDisabled ? { opacity: 0.5 } : {}),
-                        }}
-                        value={prompt}
-                        onChange={(e) => setPrompt(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Describe the component you want to build. Include details about layout, features, styling, and any specific Limio SDK hooks to use..."
-                        disabled={isDisabled}
-                        rows={8}
-                    />
-                </div>
-
-                <div style={s.footer}>
-                    {!submitted ? (
-                        <button
-                            style={{
-                                ...s.button,
-                                ...(!componentName.trim() ||
-                                !prompt.trim() ||
-                                submitting
-                                    ? s.buttonDisabled
-                                    : {}),
-                            }}
-                            onClick={handleSubmit}
-                            disabled={
-                                !componentName.trim() ||
-                                !prompt.trim() ||
-                                submitting
-                            }
-                        >
-                            {submitting
-                                ? "Sending..."
-                                : "Build Component"}
-                        </button>
-                    ) : (
-                        <button style={s.resetButton} onClick={handleReset}>
-                            Build Another
-                        </button>
-                    )}
-                    <span style={s.hint}>
-                        <strong>Cmd+Enter</strong> to submit
-                    </span>
-                </div>
-            </div>
-        </div>
-    )
-}
-
-const s = {
-    page: {
-        minHeight: "100vh",
-        background: "#f8f9fb",
-        display: "flex",
-        alignItems: "flex-start",
-        justifyContent: "center",
-        padding: "60px 20px",
-        fontFamily:
-            '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-        WebkitFontSmoothing: "antialiased",
-    },
-    card: {
-        background: "#fff",
-        borderRadius: "16px",
-        padding: "40px",
-        width: "100%",
-        maxWidth: "580px",
-        boxShadow:
-            "0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.06)",
-        display: "flex",
-        flexDirection: "column",
-        gap: "24px",
-    },
-    header: {
-        display: "flex",
-        alignItems: "center",
-        gap: "14px",
-    },
-    logo: {
-        width: "40px",
-        height: "40px",
-        borderRadius: "12px",
-        background: "linear-gradient(135deg, #d4a574 0%, #c4956a 100%)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        color: "#fff",
-        fontSize: "18px",
-        fontWeight: "700",
-        flexShrink: 0,
-    },
-    title: {
-        fontSize: "20px",
-        fontWeight: "700",
-        color: "#1a1f36",
-        margin: 0,
-        lineHeight: 1.3,
-    },
-    subtitle: {
-        fontSize: "13px",
-        color: "#697386",
-        margin: "2px 0 0",
-        lineHeight: 1.4,
-    },
-    prefillBanner: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        background: "#F5F3FF",
-        borderRadius: "10px",
-        padding: "10px 14px",
-        border: "1px solid #DDD6FE",
-        fontSize: "12px",
-        fontWeight: "500",
-        color: "#5B21B6",
-    },
-    successBanner: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        background: "#F0FDF4",
-        borderRadius: "10px",
-        padding: "10px 14px",
-        border: "1px solid #BBF7D0",
-        fontSize: "12px",
-        fontWeight: "500",
-        color: "#166534",
-        lineHeight: 1.5,
-    },
-    errorBanner: {
-        display: "flex",
-        alignItems: "center",
-        gap: "8px",
-        background: "#FEF2F2",
-        borderRadius: "10px",
-        padding: "10px 14px",
-        border: "1px solid #FECACA",
-        fontSize: "12px",
-        fontWeight: "500",
-        color: "#991B1B",
-    },
-    field: {
-        display: "flex",
-        flexDirection: "column",
-        gap: "6px",
-    },
-    label: {
-        fontSize: "13px",
-        fontWeight: "600",
-        color: "#1a1f36",
-    },
-    input: {
-        padding: "10px 12px",
-        borderRadius: "8px",
-        border: "1px solid #e3e8ee",
-        fontSize: "14px",
-        fontFamily: "inherit",
-        color: "#1a1f36",
-        outline: "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-    },
-    kebabPreview: {
-        display: "flex",
-        alignItems: "center",
-        gap: "6px",
-        fontSize: "12px",
-        color: "#697386",
-    },
-    kebabLabel: {
-        fontWeight: "500",
-    },
-    kebabValue: {
-        fontFamily:
-            '"SF Mono", SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace',
-        color: "#635BFF",
-        fontSize: "12px",
-    },
-    textarea: {
-        padding: "12px",
-        borderRadius: "8px",
-        border: "1px solid #e3e8ee",
-        fontSize: "14px",
-        fontFamily: "inherit",
-        color: "#1a1f36",
-        lineHeight: 1.6,
-        resize: "vertical",
-        outline: "none",
-        transition: "border-color 0.15s ease, box-shadow 0.15s ease",
-        minHeight: "160px",
-    },
-    footer: {
-        display: "flex",
-        alignItems: "center",
-        gap: "14px",
-    },
-    button: {
-        padding: "10px 24px",
-        borderRadius: "8px",
-        border: "none",
-        background: "#635BFF",
-        color: "#fff",
-        fontSize: "14px",
-        fontWeight: "600",
-        cursor: "pointer",
-        fontFamily: "inherit",
-        transition: "opacity 0.15s ease",
-    },
-    buttonDisabled: {
-        opacity: 0.5,
-        cursor: "not-allowed",
-    },
-    resetButton: {
-        padding: "10px 24px",
-        borderRadius: "8px",
-        border: "1px solid #e3e8ee",
-        background: "#fff",
-        color: "#1a1f36",
-        fontSize: "14px",
-        fontWeight: "600",
-        cursor: "pointer",
-        fontFamily: "inherit",
-    },
-    hint: {
-        fontSize: "12px",
-        color: "#a3acb9",
-    },
-}
-
-export default {
-    title: "Tools/New Component",
-    parameters: {
-        layout: "fullscreen",
-        previewTabs: { "storybook/docs/panel": { hidden: true } },
-    },
-}
-
-export const Builder = {
-    render: () => <BuilderPage />,
-}
-```
-
-Key features:
-- **Component name input** — auto-converts to kebab-case and shows folder path preview
-- **Prompt textarea** — describe the component, Cmd+Enter to submit
-- **Prefill support** — auto-fills from `.prompt.json` if a previous create prompt exists
-- **Mode: "create"** — the prompt is sent with `mode: "create"` so the watcher can distinguish from edit prompts
-- **Status banners** — shows success, error, and prefill states
-
----
-
-## Creating a Story
-
-After creating a component, **always** create a story file at `component-playground/src/stories/<ComponentName>.stories.js`.
-
-### Story Template
-
-```javascript
-import React from "react"
-import { LimioProvider, ComponentContext } from "@limio/sdk"
-import MyComponent from "../../../components/component-name/index"
-
-export default {
-    title: "Component Name",
-    component: MyComponent,
-    parameters: { layout: "fullscreen" },
-    decorators: [
-        (Story, context) => (
-            <LimioProvider>
-                <ComponentContext.Provider value={context.args}>
-                    <Story />
-                </ComponentContext.Provider>
-            </LimioProvider>
-        )
-    ]
-}
-
-// Default — uses limioProps defaults from the component's package.json
-export const Default = {
-    args: {
-        // Copy each limioProps entry: use its "id" as key, "default" as value
-        heading: "Choose Your Plan",
-        primaryColor__limio_color: "#635BFF",
-        showFeatures: true,
-    }
-}
-
-// Create 2-4 additional variations showcasing different configurations
-export const DarkTheme = {
-    args: {
-        ...Default.args,
-        primaryColor__limio_color: "#1a1a2e",
-    }
-}
-
-export const MinimalContent = {
-    args: {
-        ...Default.args,
-        showFeatures: false,
-    }
-}
-```
-
-### Story Creation Rules
-
-1. **Args come from limioProps** — Map each `limioProps` entry in the component's `package.json` to a story arg using its `id` as the key and `default` as the value
-2. **Create meaningful variations** — Each story should demonstrate a different visual state: different themes, with/without optional sections, different content lengths, etc.
-3. **Spread defaults for variations** — Use `...Default.args` and override only what changes
-4. **3-5 stories per component** — Default + 2-4 variations
-5. **Name stories descriptively** — `DarkTheme`, `WithBadges`, `MinimalContent`, `LongContent`, `CustomBranding`, etc.
-6. **Import path** — Components are at `../../../components/<name>/index` relative to the stories directory
-
----
-
-## Start Storybook & Get Feedback
-
-After creating the component and its story:
-
-```bash
-cd component-playground && npx storybook dev -p 6006
-```
-
-Start this as a **background task** so it keeps running.
-
-Then start the **prompt watcher** as a second background task:
-
-```bash
-node component-playground/scripts/watch-prompts.js
-```
-
-**After starting Storybook, tell the user:**
-- Storybook is running at **http://localhost:6006**
-- List each story variation you created and what it demonstrates
-- The **Claude Prompt** panel is available in the Storybook addons panel (bottom tabs) — they can type prompts there and Claude Code will automatically pick them up
-- If Limio is not yet configured, mention: "Open **Tools > Limio Setup** in the sidebar to connect your Limio account"
-- Keep Storybook and the watcher running while iterating on feedback
-
-**When the watcher background task completes** (prompt received):
-1. Read `component-playground/.prompt.json` to get the prompt
-2. Read the target component's files (`components/<component>/index.js`, `index.css`, `package.json`)
-3. Apply the requested changes
-4. Restart the watcher as a new background task
-5. Tell the user the changes are applied and Storybook should hot-reload
+For related workflows, see skills: `limio-story` (creating stories), `limio-storybook` (playground setup), `limio-setup` (credentials & deploy).

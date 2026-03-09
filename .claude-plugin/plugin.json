@@ -1,5 +1,5 @@
 {
   "name": "limio-skills",
-  "version": "3.0.0",
-  "description": "Claude Code skills for building Limio custom components with React and the @limio/sdk, including interactive Storybook prompt addon"
+  "version": "5.0.0",
+  "description": "Claude Code skills for building, verifying, and deploying Limio custom components with React and the @limio/sdk — includes component creation, SDK verification, Storybook playground, story generation, and deployment workflows"
 }
