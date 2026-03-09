@@ -1,6 +1,6 @@
 # Limio Skills for Claude Code
 
-A Claude Code plugin providing skills for building custom components on the [Limio](https://limio.com) subscription management platform.
+A Claude Code plugin providing a suite of skills for building, verifying, and deploying custom components on the [Limio](https://limio.com) subscription management platform.
 
 ## Installation
 
@@ -13,101 +13,136 @@ Add the marketplace and install the plugin:
 
 ## Available Skills
 
-### `limio-component`
+### `limio-component` — Create Components
 
-Helps you build custom React components for Limio's Page Builder with full SDK integration.
+**Audience:** Developers
 
-**Triggers automatically when you:**
+Creates Limio custom React components following official SDK guidelines and best practices.
+
+**Triggers when you:**
 - Ask to "create a Limio component" or "build a subscription component"
-- Ask to "set up Limio", "configure Limio", or "connect to Limio"
-- Ask to "launch Storybook", "start Storybook", or "run Storybook"
-- Mention `@limio/sdk`, `useCampaign`, `useBasket`, `useUser`
-- Discuss building subscription/offer components
-- Reference `limioProps`
+- Mention `@limio/sdk`, `useCampaign`, `useBasket`, `useUser`, `limioProps`
+- Discuss building React components for the Limio platform
 
 **What it provides:**
-- Component file structure and boilerplate
-- Full `@limio/sdk` hook reference (useCampaign, useBasket, useUser, etc.)
+- Component file structure (`package.json`, `index.js`, `componentStaticProps.js`, `index.css`)
+- Full `@limio/sdk` hook reference
 - limioProps configuration for all field types
-- Add-to-basket patterns
-- Page Builder compatibility guidance
-- Common utilities and best practices
-- **Claude Prompt panel** — a Storybook addon that lets you type prompts directly in the Storybook UI and Claude Code automatically picks them up, applies changes, and Storybook hot-reloads
-- **Limio Settings panel** — configure your Limio credentials (tenant, region, client ID/secret) to enable deploy and build tracking
-- **Limio Setup wizard** — a guided onboarding story page at Tools > Limio Setup for first-time connection
-- **Deploy & build tracking** — push components to Limio and monitor build status in real time
+- Add-to-basket patterns, CSS best practices, Page Builder compatibility
+- Component template with best practices built in
+
+---
+
+### `limio-sdk-verify` — Audit SDK Usage
+
+**Audience:** Developers
+
+Audits existing Limio component code against official SDK documentation.
+
+**Triggers when you:**
+- Ask to "verify SDK usage", "audit Limio code", "check SDK compliance"
+- Ask "is this using the SDK correctly" or "review Limio imports"
+- Review existing component code for correctness
+
+**What it provides:**
+- Comprehensive verification checklist (imports, hooks, data access, security)
+- Deprecated method detection with correct replacements
+- Common anti-pattern identification with fixes
+- Live doc verification via MCP when available
+
+---
+
+### `limio-story` — Create Stories
+
+**Audience:** Developers + Non-technical staff
+
+Creates Storybook stories for Limio components with meaningful variations.
+
+**Triggers when you:**
+- Ask to "create a story", "add storybook stories", "story for component"
+- Mention `.stories.js` or discuss story variations
+
+**What it provides:**
+- Story template with LimioProvider and ComponentContext decorators
+- Automatic args mapping from `limioProps` in `package.json`
+- 3-5 variation patterns per component type
+- Non-technical users can describe variations in plain language
+
+---
+
+### `limio-storybook` — Set Up Storybook Playground
+
+**Audience:** Developers
+
+Sets up and launches the full Storybook component playground with mocked SDK.
+
+**Triggers when you:**
+- Ask to "set up storybook", "launch storybook", "start storybook", "run storybook"
+- Discuss the `component-playground` environment
+
+**What it provides:**
+- Full `component-playground/` directory setup with Storybook 8
+- Mocked `@limio/sdk` hooks with realistic sample data
+- **Claude Prompt addon** — type prompts in Storybook, Claude auto-applies changes
+- **Claude Overlay** — animated loading/deploy status screens
+- **New Component builder** — create components from the Storybook UI
+- Addon version checking and auto-update
+- Prompt watcher feedback loop
+
+---
+
+### `limio-setup` — Connect & Deploy
+
+**Audience:** Developers + Non-technical staff
+
+Connects to a Limio tenant, manages credentials, and deploys components.
+
+**Triggers when you:**
+- Ask to "set up limio", "configure limio", "connect to limio"
+- Ask to "deploy component" or "push to limio"
+- Discuss Limio credentials or deployment
+
+**What it provides:**
+- Guided credential setup (via Storybook wizard or manual)
+- Smart git deployment with conflict resolution
+- Build status tracking from Limio API
+- Region support: EU, US, Dev
+
+---
 
 ## Quick Start
 
 ### Set up Limio
-
-Just say:
-
 ```
 set up limio
 ```
-
-Claude will bootstrap the full Storybook playground (if needed), install dependencies, start Storybook, and direct you to the **Tools > Limio Setup** wizard to connect your account.
-
-### Launch Storybook
-
-```
-launch storybook
-```
-
-Starts the Storybook dev server and prompt watcher if the playground already exists.
+Bootstraps the Storybook playground, starts the dev server, and opens the setup wizard.
 
 ### Build a component
-
 ```
-Create a pricing card component that displays offers from the campaign
-with a monthly/annual toggle and add to basket functionality
+Create a pricing card component that displays offers with a monthly/annual toggle
 ```
+Creates the component, sets up Storybook (if needed), generates stories, and launches the dev environment.
 
-The skill will guide Claude to:
-1. Create the component files:
-   - `package.json` with limioProps config
-   - `index.js` React component using SDK hooks
-   - `componentStaticProps.js` for props handling
-   - `index.css` with styling
-2. Set up a Storybook playground (if not already configured) with mocked `@limio/sdk` hooks
-3. Set up the Claude Prompt addon (if not already configured) for interactive prompting from Storybook
-4. Generate a story with multiple variations based on the component's limioProps
-5. Launch Storybook and the prompt watcher so you can preview and iterate interactively
+### Verify SDK usage
+```
+Verify this component follows Limio SDK best practices
+```
+Audits your code against official documentation and reports issues.
 
-## Storybook Playground
+### Create stories
+```
+Create storybook stories for the pricing-cards component with dark theme and mobile variations
+```
+Generates story files with meaningful variations based on the component's limioProps.
 
-The skill automatically sets up a `component-playground/` directory with:
-- Storybook 8 configured with webpack aliases to mock `@limio/sdk`
-- Full mock implementations of all SDK hooks (`useCampaign`, `useBasket`, `useUser`, `useCheckout`, etc.) with realistic sample data
-- Stories for each component with multiple variations
-- **Claude Prompt addon** — a panel in Storybook where you can type change requests that Claude Code processes automatically
-- **Limio Settings panel** — configure Limio API credentials and region (EU, US, or Dev)
-- **Limio Setup story** — guided onboarding wizard at Tools > Limio Setup
+### Deploy
+```
+Deploy the pricing-cards component to Limio
+```
+Commits, pushes, and tracks the Limio build.
 
-On subsequent runs, the existing playground is reused and only new stories are added.
-
-## Claude Prompt Addon
-
-The Claude Prompt addon adds an interactive feedback loop between Storybook and Claude Code:
-
-1. Open the **Claude Prompt** panel in Storybook's addon tabs
-2. Type a change request (e.g., "Make the header taller and change the gradient to blue")
-3. Click **Send to Claude** (or press Cmd+Enter)
-4. Claude Code automatically detects the prompt, reads the target component files, applies the changes, and Storybook hot-reloads
-
-The addon auto-detects which component you're viewing and includes status feedback (Working, Completed, Error) so you know what Claude Code is doing. The prompt watcher runs as a background task alongside Storybook.
-
-## Limio Connection & Deploy
-
-Connect your Limio account to deploy components and track builds:
-
-1. Open **Tools > Limio Setup** in the Storybook sidebar for the guided wizard, or use the **Limio Settings** panel in the addon tabs
-2. Enter your tenant name, region (EU / US / Dev), client ID, and client secret
-3. Credentials are validated against the Limio API before saving
-4. Once connected, the **Deploy** button in the Claude Prompt panel pushes your component to Limio and tracks the build status in real time
-
-### Supported Regions
+## Supported Regions
 
 | Region | Domain |
 |--------|--------|
@@ -119,6 +154,7 @@ Connect your Limio account to deploy components and track builds:
 
 - [Limio Custom Components Docs](https://docs.limio.com/developers/custom-components/custom-components)
 - [@limio/sdk Reference](https://docs.limio.com/developers/limio-sdk/getting-started)
+- [Development Guidelines](https://docs.limio.com/developers/custom-components/development-guidelines)
 
 ## License
 
