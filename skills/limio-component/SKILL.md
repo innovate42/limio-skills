@@ -243,6 +243,22 @@ const order = useCheckoutSelector((state) => state.order)
 const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
 ```
 
+### usePreview
+```javascript
+import { usePreview } from "@limio/sdk"
+
+const { loadingPreview, isTaxPreviewCountry, taxCalculated } = usePreview()
+```
+- Show skeleton while `loadingPreview` is true; show "calculated at checkout" when `isTaxPreviewCountry && !taxCalculated`.
+
+### useUserAccountInformation
+```javascript
+import { useUserAccountInformation } from "@limio/sdk"
+
+const { accountInformation, revalidate, mutate } = useUserAccountInformation()
+// accountInformation: { basicInfo, billingAndPayment, metrics }
+```
+
 For full SDK reference including all hook return shapes, utility functions, and subscription helpers, see `references/sdk-hooks-quickref.md`.
 
 ---
@@ -439,6 +455,50 @@ const { orderItems } = order
 ```
 
 This gives access to checkout state including `order`, `paidSchedule`, `schedule`, `locale`, and `nextActions` (for upgrades/downgrades/cross-sells).
+
+---
+
+## Subscription Update Checkout
+
+For upgrade/downgrade/plan-change flows, use `order_type: "update_subscription"`:
+
+```javascript
+// Step 1: Initiate update checkout
+await initiateCheckout({
+  order: {
+    order_type: "update_subscription",
+    forSubscription: { id: subscriptionId }
+  }
+})
+
+// Step 2: Select new offer (clear first to prevent stale state)
+clearOrderItems()
+await selectOfferForSubscriptionUpdate({ offer, quantity: 1 })
+```
+
+**Key points:** Always pass `ownerId` query param through redirects. Selecting a new offer resets checkout and triggers server-side proration recalculation. For the full flow, see `references/subscription-update-checkout.md`.
+
+---
+
+## Express Checkout (Apple Pay & Google Pay)
+
+For wallet-based express checkout, use `@limio/payment-sdk`:
+
+```jsx
+// Apple Pay (requires v107+)
+import { OrderForm, ExpressApplePayButton } from "@limio/payment-sdk"
+
+<OrderForm orderCompleteURL="/complete" onError={handleError}>
+  <ExpressApplePayButton onClick={() => setError(null)} />
+</OrderForm>
+
+// Google Pay (requires v102+)
+import { GooglePayButton } from "@limio/payment-sdk"
+
+<GooglePayButton offer={offer} buttonType="subscribe" buttonColor="black" orderCompleteUrl="/complete" />
+```
+
+For full details including `useGooglePay` hook and limitations, see `references/express-checkout.md`.
 
 ---
 
