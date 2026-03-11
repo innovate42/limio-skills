@@ -159,9 +159,80 @@ function UpgradeOffers() {
 
 ---
 
-## Pattern 2: Cross-Sell Display
+## IMPORTANT: Two Separate Checkout Flows — NEVER Mix Them
 
-From production `cross-sell` component. Cross-sells live on `orderItem.crossSell[]` in the checkout state.
+- **Flow A (Acquisition Cart)**: Items in basket, totals, upsells from `orderItem.upsell[]`, cross-sells from `orderItem.crossSell[]`. Do NOT use `nextActions`.
+- **Flow B (Subscription Update)**: Requires `initiateCheckout({ order: { order_type: "update_subscription" } })` first. Then `nextActions.upgrades[]` and `nextActions.downgrades[]` have resolved offers. Do NOT use `orderItem.upsell[]` or `orderItem.crossSell[]`.
+
+Each order item has two separate arrays:
+- `item.upsell[]` — higher-tier alternative offers (swap current item for a better one)
+- `item.crossSell[]` — add-on/complementary offers (add alongside current item)
+
+---
+
+## Pattern 2a: Upsell Display (Acquisition Cart)
+
+Upsells are higher-tier alternatives to items already in the basket. They live on `orderItem.upsell[]`.
+
+```javascript
+import { useCheckout } from "@limio/internal-checkout-sdk"
+import { useBasket, sanitiseHTML, formatCurrency } from "@limio/sdk"
+
+function UpsellDisplay() {
+  const { useCheckoutSelector } = useCheckout({ redirectOnFailure: false })
+  const { orderItems = [] } = useCheckoutSelector((state) => state.order)
+  const { basketLoading, swapOffer } = useBasket()
+
+  // Deduplicate upsell offers across all order items
+  const upsellOffers = orderItems.reduce((unique, item) => {
+    (item.upsell || []).forEach((offer) => {
+      if (!orderItems.some(i => i.offer?.id === offer.id) && !unique.some(u => u.id === offer.id))
+        unique.push({ offer, parentItemId: item.id })
+    })
+    return unique
+  }, [])
+
+  if (!upsellOffers.length) return null
+
+  const handleUpsell = async (itemId, offer) => {
+    await swapOffer(itemId, offer)
+  }
+
+  return (
+    <div>
+      {upsellOffers.map(({ offer, parentItemId }) => {
+        const attrs = offer.data?.attributes || {}
+        return (
+          <div key={offer.id}>
+            <span>{attrs.upsell_display_name__limio || attrs.display_name__limio}</span>
+            {attrs.display_price__limio && (
+              <div dangerouslySetInnerHTML={{ __html: sanitiseHTML(attrs.display_price__limio) }} />
+            )}
+            {attrs.upsell_display_description__limio && (
+              <div dangerouslySetInnerHTML={{ __html: sanitiseHTML(attrs.upsell_display_description__limio) }} />
+            )}
+            <button disabled={basketLoading} onClick={() => handleUpsell(parentItemId, offer)}>
+              Upgrade
+            </button>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+```
+
+**Key rules:**
+- Upsells come from `orderItem.upsell[]` — NOT from `nextActions` (which is subscription updates only)
+- Use `swapOffer(itemId, upsellOffer)` to replace the current item with the upsell
+- Display attributes: `upsell_display_name__limio`, `upsell_display_description__limio`
+- Fallback to `display_name__limio` if upsell-specific attributes are not set
+
+---
+
+## Pattern 2b: Cross-Sell Display (Acquisition Cart)
+
+From production `cross-sell` component. Cross-sells are add-ons/complementary products and live on `orderItem.crossSell[]` in the checkout state.
 
 ```javascript
 import { useCheckout } from "@limio/internal-checkout-sdk"
