@@ -57,13 +57,46 @@ offer = {
 | `push_to_checkout__limio` | boolean | Whether to push directly to checkout on add |
 | `block_multiple__limio` | boolean | Whether to prevent multiple subscriptions |
 
-### Cross-sell / Upsell Attributes
+### Cross-sell / Upsell / Upgrade Attributes
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `cross_sell_addons__limio` | array | Add-on offers for cross-selling |
-| `cross_sell_offers__limio` | array | Related offers for cross-selling |
-| `upsell_offers__limio` | array | Upgrade offers for upselling |
+| `upgrade_offers__limio` | `{path, id, label}[]` | Offers the subscriber can upgrade to (resolved server-side via `nextActions`) |
+| `downgrade_offers__limio` | `{path, id, label}[]` | Offers the subscriber can downgrade to (resolved server-side via `nextActions`) |
+| `upsell_offers__limio` | `{items: {path, id}[], item_type, item_label}` | Upsell offers for acquisition flows (object with items array) |
+| `cross_sell_addons__limio` | `{items: {path, id}[], item_type, item_label}` | Add-on cross-sells (object with items array) |
+| `cross_sell_add_ons__limio` | `string` | Label tag for cross-sell add-on matching |
+| `upsell_display_name__limio` | `string (HTML)` | Display name for upsell context |
+| `upsell_display_description__limio` | `string (HTML)` | Description for upsell context |
+| `upgrade_cta__limio` | `string` | CTA text for upgrade button (e.g., "Upgrade") |
+| `downgrade_cta__limio` | `string` | CTA text for downgrade button (e.g., "Downgrade") |
+| `update_configuration__limio` | `string` | Checkout page path for subscription update flow (e.g., `"/update"`) |
+
+**These are references, not full offer objects.** Resolve them against the offers from `useCampaign()`:
+
+```javascript
+const { offers } = useCampaign()
+const attributes = offer?.data?.attributes || {}
+
+// Resolve upgrade offers
+const upgradeRefs = attributes.upgrade_offers__limio || []
+const upgradeOffers = upgradeRefs
+  .map(ref => offers.find(o => o.id === ref.id || o.path === ref.path))
+  .filter(Boolean)
+
+// Resolve upsell offers (note: object with .items array)
+const upsellRefs = attributes.upsell_offers__limio?.items || []
+const upsellOffers = upsellRefs
+  .map(ref => offers.find(o => o.id === ref.id || o.path === ref.path))
+  .filter(Boolean)
+
+// Resolve cross-sell add-ons (note: object with .items array)
+const crossSellRefs = attributes.cross_sell_addons__limio?.items || []
+const { addOns } = useCampaign()
+const crossSellAddOns = crossSellRefs
+  .map(ref => addOns.find(a => a.id === ref.id || a.path === ref.path))
+  .filter(Boolean)
+```
 
 ### Term Attributes
 
@@ -209,4 +242,22 @@ const badgeText = offer?.data?.attributes?.badge_text__limio
 ### Getting the group
 ```javascript
 const group = offer?.data?.attributes?.group__limio || "default"
+```
+
+### Resolving upgrade/upsell offers
+```javascript
+// upgrade_offers__limio is an array of { path, id, label }
+// upsell_offers__limio is an object: { items: [{ path, id }], item_type, item_label }
+// These are references — resolve them against campaign offers:
+const { offers } = useCampaign()
+
+const upgradeRefs = offer?.data?.attributes?.upgrade_offers__limio || []
+const upgradeOffers = upgradeRefs
+  .map(ref => offers.find(o => o.id === ref.id || o.path === ref.path))
+  .filter(Boolean)
+
+const upsellItems = offer?.data?.attributes?.upsell_offers__limio?.items || []
+const upsellOffers = upsellItems
+  .map(ref => offers.find(o => o.id === ref.id || o.path === ref.path))
+  .filter(Boolean)
 ```

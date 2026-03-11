@@ -4,6 +4,41 @@ All hooks are imported from `@limio/sdk` unless otherwise noted.
 
 ---
 
+> **Import paths:** Most utilities can be imported from `@limio/sdk` directly. Sub-path imports are also available: `@limio/sdk/offers`, `@limio/sdk/address`, `@limio/sdk/subscription`, `@limio/sdk/date`, `@limio/sdk/price`, `@limio/sdk/zuora`.
+
+---
+
+## CRITICAL — Import Map
+
+Before writing ANY import, consult this table. Using the wrong package causes runtime errors.
+
+**From `@limio/sdk`:**
+`useCampaign`, `useBasket`, `useUser`, `useSubscriptions`, `useLimioContext`, `usePreview`, `useUserInvoices`, `useUserAccountInformation`, `useComponentProps`, `getPropsFromPackageJson`, `getCurrentOffer`, `checkActiveOffers`, `groupOffers`, `useOfferInfo`, `useSubInfo`, `useSchedule`, `formatCurrency`, `formatCurrencyForCurrentLocale`, `formatDate`, `formatDisplayPrice`, `sanitiseHTML`, `getCurrentAddress`, `addressSummary`, `formatCountry`, `getAddressMetadata`, `getCountryMetadata`, `getNextSchedule`, `getTermDates`, `getRenewalDateForUserSubscription`, `getPriceForUserSubscription`, `getSubscriptionCurrency`, `getPriceFromSchedule`, `getPeriodForOffer`, `ErrorBoundary`, `DateTime`, `LimioAppSettings`, `LimioFetchers`, `sendSummaryStatementEmail`
+
+**From `@limio/internal-checkout-sdk`:**
+`useCheckout`, `useLimioUserSubscription`, `useLimioUserSubscriptions`, `useLimioUserSubscriptionPaymentMethods`, `useLimioUserSubscriptionAddresses`
+
+**From `@limio/shop/src/shop/checkout/basket`:**
+`getCurrentBasketId`
+
+### Common Hallucinations — NEVER Use These
+
+| Wrong (does not exist) | Correct |
+|----------------------|---------|
+| `useUserSubscriptions()` | `useSubscriptions()` from `@limio/sdk` |
+| `useCheckoutSelector` as standalone import | `const { useCheckoutSelector } = useCheckout()` |
+| `useCheckout()` from `@limio/sdk` | `useCheckout()` from `@limio/internal-checkout-sdk` |
+| `selectOfferForSubscriptionUpdate` from `useCheckout` | from `useBasket()` |
+| `navigateToCheckout` from `useCheckout` | from `useBasket()` |
+| `initiateCheckout` from `useCheckout` | from `useBasket()` |
+| `useUserSubscriptionPaymentMethods` | `useLimioUserSubscriptionPaymentMethods` (needs `Limio` prefix) |
+| `useUserSubscriptionAddresses` | `useLimioUserSubscriptionAddresses` (needs `Limio` prefix) |
+| `useLimioUserSubscriptionSchedules` | Does not exist — use `subscription.schedule[]` |
+| `useLimioUserSubscriptionNextInvoice` | Does not exist — use `useUserInvoices()` |
+| Writing your own `getCurrentOffer` function | Import `getCurrentOffer` from `@limio/sdk` |
+
+For complete production code examples, see `references/production-patterns.md`.
+
 ## useCampaign
 
 Returns page/campaign data including offers.
@@ -86,17 +121,23 @@ const {
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `initiateCheckout` | `({ order: { orderItems: [{ offer }] } })` | Create new basket with initial offer |
+| `initiateCheckout` | `({ order: { orderItems: [{ offer }] } })` | Create new basket with initial offer. For subscription updates: `{ order: { order_type: "update_subscription", forSubscription: { id } } }` |
 | `addOfferToBasket` | `({ offer, quantity?, type?, parentId? })` | Add offer to existing basket |
 | `removeFromBasket` | `({ id })` | Remove item by OrderItem ID |
 | `updateItemQuantity` | `(itemId, quantity)` | Update item quantity |
 | `swapOffer` | `(itemId, offer)` | Replace item with different offer |
 | `clearOrderItems` | `()` | Empty the basket |
-| `navigateToCheckout` | `()` | Navigate to checkout page |
+| `navigateToCheckout` | `(options?)` | Navigate to checkout page. Options: `{ journey: { checkout: "/path" } }` |
 | `redeemPromoCode` | `(promoCode)` | Apply discount code |
 | `removePromoCode` | `(promoCode)` | Remove discount code |
 | `updateBasketDetails` | `(details)` | Update basket metadata |
-| `selectOfferForSubscriptionUpdate` | `(offer)` | Designate offer for subscription change |
+| `selectOfferForSubscriptionUpdate` | `({ orderItemActionType: "add", offer, type, quantity })` | Select offer for subscription upgrade/downgrade |
+
+### Basket Constraints
+
+- **One operation at a time:** Only one async basket operation can run concurrently. Starting a second will throw an error. Guard with `basketLoading`.
+- **Authentication required:** Anonymous Auth or full authentication must be enabled on every page for basket persistence. Setting auth to "None" clears basket on navigation.
+- **Basket expiration:** Baskets expire after two weeks. Check `expiresAt` and block checkout if `new Date(expiresAt).getTime() < Date.now()`.
 
 ### Add to Basket Pattern
 
@@ -113,6 +154,50 @@ const handleAddToBasket = async (offer) => {
   }
 }
 ```
+
+### Add-On Linking
+
+Use `parentId` to link add-ons to their parent offer:
+```javascript
+await addOfferToBasket({ offer: addOn, parentId: parentOrderItemId })
+```
+
+### Custom Fields
+
+Set order metadata via `updateCustomField`. Keys map to Zuora Subscription by default — suffix with `.account` to target other objects:
+```javascript
+updateCustomField("companyId", "ACME-001")
+updateCustomField("externalId.account", "ACC-12345")
+```
+
+### Basket Details Update
+
+Update customer/billing details on the basket:
+```javascript
+await updateBasketDetails({
+  data: {
+    order: {
+      customerDetails: { firstName, lastName, email, companyName },
+      billingDetails: { address1, city, state, zipCode, country }
+    }
+  }
+})
+```
+
+### Basket Validation
+
+Validate against rules like mixed billing terms:
+```javascript
+const isValid = validateBasket("preventMixedRates")
+```
+
+### Deprecated Basket APIs
+
+| Deprecated | Replacement |
+|-----------|-------------|
+| `addToBasket(offer, options?)` | `initiateCheckout` / `addOfferToBasket` |
+| `goToCheckout(basketId?, options?)` | `navigateToCheckout` |
+| `basketItems` | `orderItems` |
 
 ---
 
@@ -149,6 +234,9 @@ Returns user's subscription data.
 import { useSubscriptions } from "@limio/sdk"
 
 const { subscriptions } = useSubscriptions()
+
+// B2B multi-account: filter by owner
+const { subscriptions } = useSubscriptions({ ownerId: "owner-123" })
 ```
 
 **Subscription object shape:**
@@ -187,7 +275,12 @@ const { subscriptions } = useSubscriptions()
 }
 ```
 
-**IMPORTANT:** Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
+**IMPORTANT — Subscription field access:**
+- Status is `subscription.status` (top-level) — NOT `subscription.data?.attributes?.status__limio`
+- Name is `subscription.name` (top-level) — NOT `subscription.data?.attributes?.display_name__limio`
+- ID is `subscription.id` (top-level), reference is `subscription.reference` (top-level)
+- `__limio` attributes live on **offers**, not subscriptions. To get the display name for a subscription's plan, read the current offer: `subscription.offers[].data.offer.data.attributes.display_name__limio`
+- Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
 
 ---
 
@@ -223,8 +316,56 @@ Returns user invoice data.
 ```javascript
 import { useUserInvoices } from "@limio/sdk"
 
-const { invoices, revalidate, mutate } = useUserInvoices()
+const { invoices, revalidate, mutate, nextPage } = useUserInvoices({ pageSize: 40, page: 1 })
 ```
+
+**Parameters (optional):**
+- `pageSize` — Number of invoices per page (default: 40)
+- `page` — Page number (default: 1)
+
+**Return shape:**
+- `invoices` — Array of invoice objects (`invoiceNumber`, `amount`, `status`, `invoiceDate`, `dueDate`)
+- `revalidate()` — Refresh invoice data
+- `mutate(invoice)` — Update specific invoice optimistically
+- `nextPage` — Pagination token for next page
+
+---
+
+## useUserAccountInformation
+
+Returns billing account data from integrated providers (e.g., Zuora).
+
+```javascript
+import { useUserAccountInformation } from "@limio/sdk"
+
+const { accountInformation, revalidate, mutate } = useUserAccountInformation()
+```
+
+**Account information shape:**
+- `basicInfo.name` — Account holder name
+- `billingAndPayment` — Object with `additionalEmailAddresses`, `autoPay`, `billCycleDay`, `paymentTerm`
+- `metrics` — Object with `currency`, `totalInvoiceBalance`, `totalDebitMemoBalance`, `unappliedCreditMemoAmount`, `unappliedPaymentAmount`
+
+Methods:
+- `revalidate()` — Refresh account data
+- `mutate(data)` — Update local cache optimistically
+
+---
+
+## sendSummaryStatementEmail
+
+Sends a billing summary statement email. Import from `@limio/sdk/zuora`.
+
+```javascript
+import { sendSummaryStatementEmail } from "@limio/sdk/zuora"
+
+const { success } = await sendSummaryStatementEmail("2024-01-01")
+```
+
+**Parameters:**
+- `startDate` — Start date in `YYYY-MM-DD` format
+
+**Returns:** `{ success: boolean }`
 
 ---
 
@@ -255,13 +396,23 @@ The `nextActions` object contains `crossSells`, `upgrades`, and `downgrades` arr
 
 ## usePreview
 
-Returns preview/tax calculation state.
+Returns tax preview/calculation state. Import from `@limio/sdk`.
 
 ```javascript
 import { usePreview } from "@limio/sdk"
 
 const { loadingPreview, isTaxPreviewCountry, taxCalculated } = usePreview()
 ```
+
+**Return shape:**
+- `loadingPreview` — Boolean, true during preview API calculations
+- `isTaxPreviewCountry` — Boolean, true if customer's country requires checkout-time tax calculation
+- `taxCalculated` — Boolean, true once tax has been successfully computed
+
+**Display logic:**
+- Show skeleton/loader while `loadingPreview` is true
+- Show "calculated at checkout" when `isTaxPreviewCountry && !taxCalculated`
+- Show tax-included totals once `taxCalculated` is true
 
 ---
 
@@ -388,12 +539,54 @@ import {
   getPeriodForOffer,      // (offer) => "1 month" | "1 year" | "N/A"
   getRenewalDateForUserSubscription,  // (subscription) => formatted date
   getPriceForUserSubscription,        // (subscription) => formatted price
+  getNextSchedule,        // (schedule) => next upcoming payment entry
 } from "@limio/sdk"
+```
+
+### getNextSchedule
+
+Filters a subscription's schedule array for the next upcoming payment:
+```javascript
+const nextPayment = getNextSchedule(subscription.schedule)
+// Finds first entry where date is future and status is "active", "pending", or "pending-external"
 ```
 
 ### Subscription References
 
 Use `subscription.reference` or `subscription.id` for linking between pages. Pass as URL query params (e.g. `?subRef=...` or `?subId=...`).
+
+---
+
+## Subscription Address & Payment Hooks
+
+These hooks are imported from `@limio/internal-checkout-sdk` and retrieve address/payment data for specific subscriptions.
+
+### useLimioUserSubscriptionAddresses
+
+```javascript
+import { useLimioUserSubscriptionAddresses } from "@limio/internal-checkout-sdk"
+
+const { addresses, revalidate } = useLimioUserSubscriptionAddresses(subscriptionId)
+```
+
+Use with `getCurrentAddress` to extract by type:
+```javascript
+import { getCurrentAddress } from "@limio/sdk"
+
+const billingAddress = getCurrentAddress("billing", addresses)
+const deliveryAddress = getCurrentAddress("delivery", addresses)
+// Returns: { data: { firstName, lastName, address1, city, state, zipCode, country } }
+```
+
+### useLimioUserSubscriptionPaymentMethods
+
+```javascript
+import { useLimioUserSubscriptionPaymentMethods } from "@limio/internal-checkout-sdk"
+
+const { payment_methods, revalidate } = useLimioUserSubscriptionPaymentMethods(subscriptionId)
+```
+
+Returns stored payment methods with card type, last four digits, and expiry.
 
 ---
 

@@ -243,6 +243,22 @@ const order = useCheckoutSelector((state) => state.order)
 const orderTotals = useCheckoutSelector((state) => state.display.orderTotal)
 ```
 
+### usePreview
+```javascript
+import { usePreview } from "@limio/sdk"
+
+const { loadingPreview, isTaxPreviewCountry, taxCalculated } = usePreview()
+```
+- Show skeleton while `loadingPreview` is true; show "calculated at checkout" when `isTaxPreviewCountry && !taxCalculated`.
+
+### useUserAccountInformation
+```javascript
+import { useUserAccountInformation } from "@limio/sdk"
+
+const { accountInformation, revalidate, mutate } = useUserAccountInformation()
+// accountInformation: { basicInfo, billingAndPayment, metrics }
+```
+
 For full SDK reference including all hook return shapes, utility functions, and subscription helpers, see `references/sdk-hooks-quickref.md`.
 
 ---
@@ -442,6 +458,50 @@ This gives access to checkout state including `order`, `paidSchedule`, `schedule
 
 ---
 
+## Subscription Update Checkout
+
+For upgrade/downgrade/plan-change flows, use `order_type: "update_subscription"`:
+
+```javascript
+// Step 1: Initiate update checkout
+await initiateCheckout({
+  order: {
+    order_type: "update_subscription",
+    forSubscription: { id: subscriptionId }
+  }
+})
+
+// Step 2: Select new offer (clear first to prevent stale state)
+clearOrderItems()
+await selectOfferForSubscriptionUpdate({ offer, quantity: 1 })
+```
+
+**Key points:** Always pass `ownerId` query param through redirects. Selecting a new offer resets checkout and triggers server-side proration recalculation. For the full flow, see `references/subscription-update-checkout.md`.
+
+---
+
+## Express Checkout (Apple Pay & Google Pay)
+
+For wallet-based express checkout, use `@limio/payment-sdk`:
+
+```jsx
+// Apple Pay (requires v107+)
+import { OrderForm, ExpressApplePayButton } from "@limio/payment-sdk"
+
+<OrderForm orderCompleteURL="/complete" onError={handleError}>
+  <ExpressApplePayButton onClick={() => setError(null)} />
+</OrderForm>
+
+// Google Pay (requires v102+)
+import { GooglePayButton } from "@limio/payment-sdk"
+
+<GooglePayButton offer={offer} buttonType="subscribe" buttonColor="black" orderCompleteUrl="/complete" />
+```
+
+For full details including `useGooglePay` hook and limitations, see `references/express-checkout.md`.
+
+---
+
 ## Handlebars Templating in Offer Attributes
 
 Offer attributes can contain Handlebars templates. Use `parseString` to render them:
@@ -480,6 +540,74 @@ limioProps can also use templates: `"default": "{{data.attributes.display_descri
 12. **Contrast colors** — When using configurable background colors for buttons, calculate contrasting text color for accessibility.
 13. **Subscription references** — Use `subscription.reference` or `subscription.id` for linking. Pass as URL query params (e.g. `?subRef=...`).
 14. **Subscription offers access** — Always use `subscription.offers[]` array to access offers. Do NOT use `subscription.data.offer` (legacy). A subscription can have multiple offers (standard + discount), so filter where `record_subtype` is NOT `"discount"` and check `start`/`end` dates to find the current active standard offer.
+
+---
+
+## CRITICAL — Common Mistakes (Hallucination Prevention)
+
+Before writing any import or hook call, **consult `references/production-patterns.md`** for the canonical import map and production code examples.
+
+### Import Mistakes
+These are the most common errors. Every one causes a runtime crash.
+
+| WRONG (will crash) | CORRECT |
+|-------------------|---------|
+| `import { useCheckout } from "@limio/sdk"` | `import { useCheckout } from "@limio/internal-checkout-sdk"` |
+| `import { useCheckoutSelector } from "..."` | `const { useCheckoutSelector } = useCheckout()` — it's a method, not an import |
+| `import { useUserSubscriptions } from "..."` | `import { useSubscriptions } from "@limio/sdk"` |
+| `import { useUserSubscriptionPaymentMethods } from "..."` | `import { useLimioUserSubscriptionPaymentMethods } from "@limio/internal-checkout-sdk"` |
+| `import { useUserSubscriptionAddresses } from "..."` | `import { useLimioUserSubscriptionAddresses } from "@limio/internal-checkout-sdk"` |
+| `const { selectOfferForSubscriptionUpdate } = useCheckout()` | `const { selectOfferForSubscriptionUpdate } = useBasket()` |
+| `const { navigateToCheckout } = useCheckout()` | `const { navigateToCheckout } = useBasket()` |
+| `const { initiateCheckout } = useCheckout()` | `const { initiateCheckout } = useBasket()` |
+
+### Data Access Mistakes
+
+| WRONG | CORRECT |
+|-------|---------|
+| `subscription.data?.attributes?.status__limio` | `subscription.status` (top-level) |
+| `subscription.data?.attributes?.display_name__limio` | `getCurrentOffer(subscription)?.data?.attributes?.display_name__limio` |
+| Writing your own `getCurrentOffer` function | `import { getCurrentOffer } from "@limio/sdk"` |
+| `offer.attributes.x` | `offer.data.attributes.x` |
+| `user.firstName` | `attributes.firstName` (from `useUser()`) |
+
+### Hook Invention Mistakes
+
+These hooks DO NOT EXIST — do not guess function names:
+- `useLimioUserSubscriptionSchedules` → use `subscription.schedule[]`
+- `useLimioUserSubscriptionNextInvoice` → use `useUserInvoices()`
+- `useLimioUserSubscriptionInvoices` → use `useUserInvoices()`
+- `useLimioUserSubscriptionUsage` → does not exist
+
+---
+
+## Cart / Basket Display Pattern
+
+For building cart pages, order summaries, or checkout displays:
+
+```javascript
+import { useCheckout } from "@limio/internal-checkout-sdk"
+import { useBasket, sanitiseHTML, formatCurrency } from "@limio/sdk"
+
+// Order items from checkout state
+const { useCheckoutSelector } = useCheckout({ redirectOnFailure: false })
+const { orderItems = [] } = useCheckoutSelector((state) => state.order)
+
+// Order totals from checkout display
+const orderTotals = useCheckoutSelector((state) => state.display?.orderTotal) || {}
+// orderTotals: { orderSubtotal, orderTotal, currency, taxSummary: [{ taxCode, taxAmount, taxRate }] }
+
+// Basket actions
+const { basketLoading, removeFromBasket, updateItemQuantity, navigateToCheckout } = useBasket()
+
+// Each orderItem has: item.id, item.offer, item.quantity, item.type, item.crossSell[]
+// Access offer data: item.offer?.data?.attributes?.display_name__limio
+// Access product: item.offer?.data?.products?.[0]?.attributes?.display_name__limio
+// Access image: item.offer?.data?.attachments?.find(a => a.type?.includes("image"))
+// Quantity editable: item.offer?.data?.attributes?.allow_multibuy__limio
+```
+
+For the full cart component example, see `references/production-patterns.md` Pattern 3.
 
 ---
 
