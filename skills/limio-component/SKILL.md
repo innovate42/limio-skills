@@ -543,6 +543,74 @@ limioProps can also use templates: `"default": "{{data.attributes.display_descri
 
 ---
 
+## CRITICAL — Common Mistakes (Hallucination Prevention)
+
+Before writing any import or hook call, **consult `references/production-patterns.md`** for the canonical import map and production code examples.
+
+### Import Mistakes
+These are the most common errors. Every one causes a runtime crash.
+
+| WRONG (will crash) | CORRECT |
+|-------------------|---------|
+| `import { useCheckout } from "@limio/sdk"` | `import { useCheckout } from "@limio/internal-checkout-sdk"` |
+| `import { useCheckoutSelector } from "..."` | `const { useCheckoutSelector } = useCheckout()` — it's a method, not an import |
+| `import { useUserSubscriptions } from "..."` | `import { useSubscriptions } from "@limio/sdk"` |
+| `import { useUserSubscriptionPaymentMethods } from "..."` | `import { useLimioUserSubscriptionPaymentMethods } from "@limio/internal-checkout-sdk"` |
+| `import { useUserSubscriptionAddresses } from "..."` | `import { useLimioUserSubscriptionAddresses } from "@limio/internal-checkout-sdk"` |
+| `const { selectOfferForSubscriptionUpdate } = useCheckout()` | `const { selectOfferForSubscriptionUpdate } = useBasket()` |
+| `const { navigateToCheckout } = useCheckout()` | `const { navigateToCheckout } = useBasket()` |
+| `const { initiateCheckout } = useCheckout()` | `const { initiateCheckout } = useBasket()` |
+
+### Data Access Mistakes
+
+| WRONG | CORRECT |
+|-------|---------|
+| `subscription.data?.attributes?.status__limio` | `subscription.status` (top-level) |
+| `subscription.data?.attributes?.display_name__limio` | `getCurrentOffer(subscription)?.data?.attributes?.display_name__limio` |
+| Writing your own `getCurrentOffer` function | `import { getCurrentOffer } from "@limio/sdk"` |
+| `offer.attributes.x` | `offer.data.attributes.x` |
+| `user.firstName` | `attributes.firstName` (from `useUser()`) |
+
+### Hook Invention Mistakes
+
+These hooks DO NOT EXIST — do not guess function names:
+- `useLimioUserSubscriptionSchedules` → use `subscription.schedule[]`
+- `useLimioUserSubscriptionNextInvoice` → use `useUserInvoices()`
+- `useLimioUserSubscriptionInvoices` → use `useUserInvoices()`
+- `useLimioUserSubscriptionUsage` → does not exist
+
+---
+
+## Cart / Basket Display Pattern
+
+For building cart pages, order summaries, or checkout displays:
+
+```javascript
+import { useCheckout } from "@limio/internal-checkout-sdk"
+import { useBasket, sanitiseHTML, formatCurrency } from "@limio/sdk"
+
+// Order items from checkout state
+const { useCheckoutSelector } = useCheckout({ redirectOnFailure: false })
+const { orderItems = [] } = useCheckoutSelector((state) => state.order)
+
+// Order totals from checkout display
+const orderTotals = useCheckoutSelector((state) => state.display?.orderTotal) || {}
+// orderTotals: { orderSubtotal, orderTotal, currency, taxSummary: [{ taxCode, taxAmount, taxRate }] }
+
+// Basket actions
+const { basketLoading, removeFromBasket, updateItemQuantity, navigateToCheckout } = useBasket()
+
+// Each orderItem has: item.id, item.offer, item.quantity, item.type, item.crossSell[]
+// Access offer data: item.offer?.data?.attributes?.display_name__limio
+// Access product: item.offer?.data?.products?.[0]?.attributes?.display_name__limio
+// Access image: item.offer?.data?.attachments?.find(a => a.type?.includes("image"))
+// Quantity editable: item.offer?.data?.attributes?.allow_multibuy__limio
+```
+
+For the full cart component example, see `references/production-patterns.md` Pattern 3.
+
+---
+
 ## Troubleshooting
 
 | Issue | Cause | Fix |

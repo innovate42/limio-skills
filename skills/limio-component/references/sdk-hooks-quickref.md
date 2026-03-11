@@ -6,6 +6,39 @@ All hooks are imported from `@limio/sdk` unless otherwise noted.
 
 > **Import paths:** Most utilities can be imported from `@limio/sdk` directly. Sub-path imports are also available: `@limio/sdk/offers`, `@limio/sdk/address`, `@limio/sdk/subscription`, `@limio/sdk/date`, `@limio/sdk/price`, `@limio/sdk/zuora`.
 
+---
+
+## CRITICAL — Import Map
+
+Before writing ANY import, consult this table. Using the wrong package causes runtime errors.
+
+**From `@limio/sdk`:**
+`useCampaign`, `useBasket`, `useUser`, `useSubscriptions`, `useLimioContext`, `usePreview`, `useUserInvoices`, `useUserAccountInformation`, `useComponentProps`, `getPropsFromPackageJson`, `getCurrentOffer`, `checkActiveOffers`, `groupOffers`, `useOfferInfo`, `useSubInfo`, `useSchedule`, `formatCurrency`, `formatCurrencyForCurrentLocale`, `formatDate`, `formatDisplayPrice`, `sanitiseHTML`, `getCurrentAddress`, `addressSummary`, `formatCountry`, `getAddressMetadata`, `getCountryMetadata`, `getNextSchedule`, `getTermDates`, `getRenewalDateForUserSubscription`, `getPriceForUserSubscription`, `getSubscriptionCurrency`, `getPriceFromSchedule`, `getPeriodForOffer`, `ErrorBoundary`, `DateTime`, `LimioAppSettings`, `LimioFetchers`, `sendSummaryStatementEmail`
+
+**From `@limio/internal-checkout-sdk`:**
+`useCheckout`, `useLimioUserSubscription`, `useLimioUserSubscriptions`, `useLimioUserSubscriptionPaymentMethods`, `useLimioUserSubscriptionAddresses`
+
+**From `@limio/shop/src/shop/checkout/basket`:**
+`getCurrentBasketId`
+
+### Common Hallucinations — NEVER Use These
+
+| Wrong (does not exist) | Correct |
+|----------------------|---------|
+| `useUserSubscriptions()` | `useSubscriptions()` from `@limio/sdk` |
+| `useCheckoutSelector` as standalone import | `const { useCheckoutSelector } = useCheckout()` |
+| `useCheckout()` from `@limio/sdk` | `useCheckout()` from `@limio/internal-checkout-sdk` |
+| `selectOfferForSubscriptionUpdate` from `useCheckout` | from `useBasket()` |
+| `navigateToCheckout` from `useCheckout` | from `useBasket()` |
+| `initiateCheckout` from `useCheckout` | from `useBasket()` |
+| `useUserSubscriptionPaymentMethods` | `useLimioUserSubscriptionPaymentMethods` (needs `Limio` prefix) |
+| `useUserSubscriptionAddresses` | `useLimioUserSubscriptionAddresses` (needs `Limio` prefix) |
+| `useLimioUserSubscriptionSchedules` | Does not exist — use `subscription.schedule[]` |
+| `useLimioUserSubscriptionNextInvoice` | Does not exist — use `useUserInvoices()` |
+| Writing your own `getCurrentOffer` function | Import `getCurrentOffer` from `@limio/sdk` |
+
+For complete production code examples, see `references/production-patterns.md`.
+
 ## useCampaign
 
 Returns page/campaign data including offers.
