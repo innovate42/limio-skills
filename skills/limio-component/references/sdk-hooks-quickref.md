@@ -242,7 +242,12 @@ const { subscriptions } = useSubscriptions({ ownerId: "owner-123" })
 }
 ```
 
-**IMPORTANT:** Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
+**IMPORTANT — Subscription field access:**
+- Status is `subscription.status` (top-level) — NOT `subscription.data?.attributes?.status__limio`
+- Name is `subscription.name` (top-level) — NOT `subscription.data?.attributes?.display_name__limio`
+- ID is `subscription.id` (top-level), reference is `subscription.reference` (top-level)
+- `__limio` attributes live on **offers**, not subscriptions. To get the display name for a subscription's plan, read the current offer: `subscription.offers[].data.offer.data.attributes.display_name__limio`
+- Always access offers via `subscription.offers[]` — this is the documented pattern. A subscription can have multiple offers (e.g. a standard offer + a discount offer). Do NOT use `subscription.data.offer` as that is a legacy field. To get the current standard offer, filter `subscription.offers` where `record_subtype` is NOT `"discount"` and check `start`/`end` dates.
 
 ---
 
