@@ -61,14 +61,16 @@ offer = {
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `upgrade_offers__limio` | `{path, id, label}[]` | Offers the subscriber can upgrade to |
-| `upsell_offers__limio` | `{items: {path, id}[], item_type, item_label}` | Upsell offers (object with items array) |
+| `upgrade_offers__limio` | `{path, id, label}[]` | Offers the subscriber can upgrade to (resolved server-side via `nextActions`) |
+| `downgrade_offers__limio` | `{path, id, label}[]` | Offers the subscriber can downgrade to (resolved server-side via `nextActions`) |
+| `upsell_offers__limio` | `{items: {path, id}[], item_type, item_label}` | Upsell offers for acquisition flows (object with items array) |
 | `cross_sell_addons__limio` | `{items: {path, id}[], item_type, item_label}` | Add-on cross-sells (object with items array) |
 | `cross_sell_add_ons__limio` | `string` | Label tag for cross-sell add-on matching |
 | `upsell_display_name__limio` | `string (HTML)` | Display name for upsell context |
 | `upsell_display_description__limio` | `string (HTML)` | Description for upsell context |
 | `upgrade_cta__limio` | `string` | CTA text for upgrade button (e.g., "Upgrade") |
 | `downgrade_cta__limio` | `string` | CTA text for downgrade button (e.g., "Downgrade") |
+| `update_configuration__limio` | `string` | Checkout page path for subscription update flow (e.g., `"/update"`) |
 
 **These are references, not full offer objects.** Resolve them against the offers from `useCampaign()`:
 

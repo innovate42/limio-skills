@@ -88,17 +88,17 @@ const {
 
 | Method | Signature | Description |
 |--------|-----------|-------------|
-| `initiateCheckout` | `({ order: { orderItems: [{ offer }] } })` | Create new basket with initial offer |
+| `initiateCheckout` | `({ order: { orderItems: [{ offer }] } })` | Create new basket with initial offer. For subscription updates: `{ order: { order_type: "update_subscription", forSubscription: { id } } }` |
 | `addOfferToBasket` | `({ offer, quantity?, type?, parentId? })` | Add offer to existing basket |
 | `removeFromBasket` | `({ id })` | Remove item by OrderItem ID |
 | `updateItemQuantity` | `(itemId, quantity)` | Update item quantity |
 | `swapOffer` | `(itemId, offer)` | Replace item with different offer |
 | `clearOrderItems` | `()` | Empty the basket |
-| `navigateToCheckout` | `()` | Navigate to checkout page |
+| `navigateToCheckout` | `(options?)` | Navigate to checkout page. Options: `{ journey: { checkout: "/path" } }` |
 | `redeemPromoCode` | `(promoCode)` | Apply discount code |
 | `removePromoCode` | `(promoCode)` | Remove discount code |
 | `updateBasketDetails` | `(details)` | Update basket metadata |
-| `selectOfferForSubscriptionUpdate` | `(offer)` | Designate offer for subscription change |
+| `selectOfferForSubscriptionUpdate` | `({ orderItemActionType: "add", offer, type, quantity })` | Select offer for subscription upgrade/downgrade |
 
 ### Basket Constraints
 
