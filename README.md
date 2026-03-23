@@ -21,38 +21,38 @@ All five skills are installed together as a single plugin. Each one activates au
 
 ### First-time setup
 
-Run this command in the Claude Code CLI:
+Two steps — add the marketplace, then install the plugin:
 
-```
-/install-plugin innovate42/limio-skills
+```shell
+/plugin marketplace add innovate42/limio-skills
 ```
 
-This installs all five skills at once. They'll start working immediately — just ask Claude to do something Limio-related and the right skill kicks in.
+```shell
+/plugin install limio-skills@innovate42-limio-skills
+```
+
+After installing, run `/reload-plugins` to activate. All five skills start working immediately — just ask Claude to do something Limio-related and the right skill kicks in.
 
 ### Updating to the latest version
 
 If you already have the plugin installed and want to pull the latest changes:
 
-```
-/install-plugin innovate42/limio-skills
+```shell
+/plugin marketplace update innovate42-limio-skills
 ```
 
-Running the install command again will update the plugin to the latest version from the `production` branch.
+This fetches the latest version from the `production` branch. Run `/reload-plugins` afterwards to pick up the changes.
+
+You can also enable auto-updates so the plugin stays current automatically — open `/plugin`, go to the **Marketplaces** tab, select `innovate42-limio-skills`, and choose **Enable auto-update**.
 
 ### Verifying installation
 
-To confirm the plugin is installed and see which skills are available:
-
-```
-/plugins
-```
-
-You should see `limio-skills` listed with all five skills.
+Run `/plugin` and check the **Installed** tab. You should see `limio-skills` listed with all five skills.
 
 ### Uninstalling
 
-```
-/uninstall-plugin limio-skills
+```shell
+/plugin uninstall limio-skills@innovate42-limio-skills
 ```
 
 ## Available Skills
