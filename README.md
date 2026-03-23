@@ -28,7 +28,7 @@ Two steps — add the marketplace, then install the plugin:
 ```
 
 ```shell
-/plugin install limio-skills@innovate42-limio-skills
+/plugin install limio-skills@limio-skills
 ```
 
 After installing, run `/reload-plugins` to activate. All five skills start working immediately — just ask Claude to do something Limio-related and the right skill kicks in.
@@ -38,12 +38,12 @@ After installing, run `/reload-plugins` to activate. All five skills start worki
 If you already have the plugin installed and want to pull the latest changes:
 
 ```shell
-/plugin marketplace update innovate42-limio-skills
+/plugin marketplace update limio-skills
 ```
 
 This fetches the latest version from the `production` branch. Run `/reload-plugins` afterwards to pick up the changes.
 
-You can also enable auto-updates so the plugin stays current automatically — open `/plugin`, go to the **Marketplaces** tab, select `innovate42-limio-skills`, and choose **Enable auto-update**.
+You can also enable auto-updates so the plugin stays current automatically — open `/plugin`, go to the **Marketplaces** tab, select `limio-skills`, and choose **Enable auto-update**.
 
 ### Verifying installation
 
@@ -52,7 +52,7 @@ Run `/plugin` and check the **Installed** tab. You should see `limio-skills` lis
 ### Uninstalling
 
 ```shell
-/plugin uninstall limio-skills@innovate42-limio-skills
+/plugin uninstall limio-skills@limio-skills
 ```
 
 ## Available Skills
