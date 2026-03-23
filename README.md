@@ -1,14 +1,58 @@
 # Limio Skills for Claude Code
 
-A Claude Code plugin providing a suite of skills for building, verifying, and deploying custom components on the [Limio](https://limio.com) subscription management platform.
+A Claude Code plugin that gives Claude **five specialised skills** for the [Limio](https://limio.com) subscription management platform — from creating components to deploying them to your tenant.
+
+| Skill | What it does | Audience |
+|-------|-------------|----------|
+| [`limio-component`](#limio-component--create-components) | Creates custom React components with the `@limio/sdk` | Developers |
+| [`limio-sdk-verify`](#limio-sdk-verify--audit-sdk-usage) | Audits existing code against SDK best practices | Developers |
+| [`limio-story`](#limio-story--create-stories) | Generates Storybook stories with meaningful variations | Developers + Non-technical |
+| [`limio-storybook`](#limio-storybook--set-up-storybook-playground) | Sets up the full Storybook component playground | Developers |
+| [`limio-setup`](#limio-setup--connect--deploy) | Connects to a Limio tenant, manages credentials, and deploys | Developers + Non-technical |
+
+All five skills are installed together as a single plugin. Each one activates automatically based on what you ask Claude to do — there's nothing extra to configure or enable per-skill.
+
+## Prerequisites
+
+- [Claude Code CLI](https://docs.anthropic.com/en/docs/claude-code) installed and authenticated
+- A Limio tenant (for deployment — not required for local development)
 
 ## Installation
 
-Add the marketplace and install the plugin:
+### First-time setup
+
+Run this command in the Claude Code CLI:
 
 ```
-/plugin marketplace add innovate42/limio-skills
-/plugin install limio-skills
+/install-plugin innovate42/limio-skills
+```
+
+This installs all five skills at once. They'll start working immediately — just ask Claude to do something Limio-related and the right skill kicks in.
+
+### Updating to the latest version
+
+If you already have the plugin installed and want to pull the latest changes:
+
+```
+/install-plugin innovate42/limio-skills
+```
+
+Running the install command again will update the plugin to the latest version from the `production` branch.
+
+### Verifying installation
+
+To confirm the plugin is installed and see which skills are available:
+
+```
+/plugins
+```
+
+You should see `limio-skills` listed with all five skills.
+
+### Uninstalling
+
+```
+/uninstall-plugin limio-skills
 ```
 
 ## Available Skills
@@ -19,10 +63,13 @@ Add the marketplace and install the plugin:
 
 Creates Limio custom React components following official SDK guidelines and best practices.
 
-**Triggers when you:**
-- Ask to "create a Limio component" or "build a subscription component"
-- Mention `@limio/sdk`, `useCampaign`, `useBasket`, `useUser`, `limioProps`
-- Discuss building React components for the Limio platform
+**Example prompts:**
+```
+Create a pricing card component that shows offers with a monthly/annual toggle
+```
+```
+Build a subscription management component using useCampaign and useBasket
+```
 
 **What it provides:**
 - Component file structure (`package.json`, `index.js`, `componentStaticProps.js`, `index.css`)
@@ -39,10 +86,16 @@ Creates Limio custom React components following official SDK guidelines and best
 
 Audits existing Limio component code against official SDK documentation.
 
-**Triggers when you:**
-- Ask to "verify SDK usage", "audit Limio code", "check SDK compliance"
-- Ask "is this using the SDK correctly" or "review Limio imports"
-- Review existing component code for correctness
+**Example prompts:**
+```
+Verify this component follows Limio SDK best practices
+```
+```
+Audit the pricing-cards component for deprecated SDK usage
+```
+```
+Is my component using the SDK correctly?
+```
 
 **What it provides:**
 - Comprehensive verification checklist (imports, hooks, data access, security)
@@ -58,9 +111,16 @@ Audits existing Limio component code against official SDK documentation.
 
 Creates Storybook stories for Limio components with meaningful variations.
 
-**Triggers when you:**
-- Ask to "create a story", "add storybook stories", "story for component"
-- Mention `.stories.js` or discuss story variations
+**Example prompts:**
+```
+Create storybook stories for the pricing-cards component
+```
+```
+Add stories with dark theme and mobile variations
+```
+```
+I want a story showing what the card looks like with a long title and no discount
+```
 
 **What it provides:**
 - Story template with LimioProvider and ComponentContext decorators
@@ -76,9 +136,16 @@ Creates Storybook stories for Limio components with meaningful variations.
 
 Sets up and launches the full Storybook component playground with mocked SDK.
 
-**Triggers when you:**
-- Ask to "set up storybook", "launch storybook", "start storybook", "run storybook"
-- Discuss the `component-playground` environment
+**Example prompts:**
+```
+Set up storybook
+```
+```
+Launch the storybook playground
+```
+```
+Start storybook
+```
 
 **What it provides:**
 - Full `component-playground/` directory setup with Storybook 8
@@ -97,10 +164,16 @@ Sets up and launches the full Storybook component playground with mocked SDK.
 
 Connects to a Limio tenant, manages credentials, and deploys components.
 
-**Triggers when you:**
-- Ask to "set up limio", "configure limio", "connect to limio"
-- Ask to "deploy component" or "push to limio"
-- Discuss Limio credentials or deployment
+**Example prompts:**
+```
+Set up limio
+```
+```
+Connect to my Limio tenant
+```
+```
+Deploy the pricing-cards component to Limio
+```
 
 **What it provides:**
 - Guided credential setup (via Storybook wizard or manual)
@@ -112,31 +185,31 @@ Connects to a Limio tenant, manages credentials, and deploys components.
 
 ## Quick Start
 
-### Set up Limio
+### 1. Set up Limio
 ```
 set up limio
 ```
 Bootstraps the Storybook playground, starts the dev server, and opens the setup wizard.
 
-### Build a component
+### 2. Build a component
 ```
 Create a pricing card component that displays offers with a monthly/annual toggle
 ```
 Creates the component, sets up Storybook (if needed), generates stories, and launches the dev environment.
 
-### Verify SDK usage
+### 3. Verify SDK usage
 ```
 Verify this component follows Limio SDK best practices
 ```
 Audits your code against official documentation and reports issues.
 
-### Create stories
+### 4. Create stories
 ```
 Create storybook stories for the pricing-cards component with dark theme and mobile variations
 ```
 Generates story files with meaningful variations based on the component's limioProps.
 
-### Deploy
+### 5. Deploy
 ```
 Deploy the pricing-cards component to Limio
 ```
