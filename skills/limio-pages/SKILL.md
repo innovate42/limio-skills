@@ -48,6 +48,8 @@ Decision table:
 
 6. **Publish**: `POST /api/publish {tags, buildId, name}` with the `id` from step 5.
 
+   **Publishing is immediate and production-facing — get human sign-off first.** There is no staged approval between publish and visitors seeing the page. Before publishing to a production tenant, show the user what will go live (local render screenshot, Page Builder Preview, or the staged build) and get an explicit go-ahead — especially for generated or bulk-updated pages, where one assembly bug ships to every visitor at once. Only skip the confirmation if the user has already explicitly asked for auto-publish in this session, or the target is a sandbox tenant.
+
 ## The New-Route Trap (the #1 time sink — warn the user)
 
 `POST /api/publish` returns `success: true` **even when it didn't publish your page**. Always check both maps in the response:
