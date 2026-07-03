@@ -48,6 +48,7 @@ When auditing a Limio component, check each of the following areas in order:
 ### 4. Security
 
 - [ ] Rich text/HTML sanitized with `xss` library or `sanitiseHTML` from SDK
+- [ ] `xss` (and every other imported package) declared in the component's `package.json` `dependencies` — a missing declaration crashes the published page's server-side render even though Storybook works
 - [ ] No unsanitized `dangerouslySetInnerHTML`
 - [ ] `.limio.json` not committed or staged in git
 - [ ] No hardcoded credentials or tokens
@@ -69,6 +70,8 @@ When auditing a Limio component, check each of the following areas in order:
 - [ ] Rich text props use `"type": "richtext"` (no special suffix on ID)
 - [ ] Props have sensible defaults
 - [ ] No legacy `__limio_richtext` or `__limio_color` suffixes on prop IDs
+
+> **Renaming prop IDs is a breaking change for existing pages.** Page assets store prop values keyed by `limioProps` id — renaming an id (including stripping a legacy suffix) silently orphans that content on every page already using the component; the component falls back to its defaults. Before recommending a rename on a component that is live on pages, flag that the page assets' `props` must be migrated to the new id in the same change.
 
 ### 7. Basket & Checkout
 

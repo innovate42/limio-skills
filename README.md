@@ -1,6 +1,6 @@
 # Limio Skills for Claude Code
 
-A Claude Code plugin that gives Claude **five specialised skills** for the [Limio](https://limio.com) subscription management platform — from creating components to deploying them to your tenant.
+A Claude Code plugin that gives Claude **six specialised skills** for the [Limio](https://limio.com) subscription management platform — from creating components to assembling them into live pages on your tenant.
 
 | Skill | What it does | Audience |
 |-------|-------------|----------|
@@ -9,8 +9,9 @@ A Claude Code plugin that gives Claude **five specialised skills** for the [Limi
 | [`limio-story`](#limio-story--create-stories) | Generates Storybook stories with meaningful variations | Developers + Non-technical |
 | [`limio-storybook`](#limio-storybook--set-up-storybook-playground) | Sets up the full Storybook component playground | Developers |
 | [`limio-setup`](#limio-setup--connect--deploy) | Connects to a Limio tenant, manages credentials, and deploys | Developers + Non-technical |
+| `limio-pages` | Assembles components into pages via the API — landing-page factories, publishing, and site migrations | Developers |
 
-All five skills are installed together as a single plugin. Each one activates automatically based on what you ask Claude to do — there's nothing extra to configure or enable per-skill.
+All six skills are installed together as a single plugin. Each one activates automatically based on what you ask Claude to do — there's nothing extra to configure or enable per-skill.
 
 ## Prerequisites
 

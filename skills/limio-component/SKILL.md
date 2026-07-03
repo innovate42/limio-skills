@@ -70,6 +70,10 @@ You can import **any public npm library** in the dependencies. Limio's build sys
 - `@emotion/react` / `@emotion/styled` — Required for MUI
 - `date-fns` or `dayjs` — Date formatting
 
+**CRITICAL: every import must be declared in the component's `package.json` `dependencies`.** Components server-render during shop builds; an undeclared dependency (classically `xss` when using `sanitiseHTML`) works fine in Storybook and then **crashes the published page's server render** — the page shows an endless spinner or error placeholder. If the component imports it (directly or via `sanitiseHTML`), declare it.
+
+**Building marketing/landing-page components** (heroes, panels, grids, quote bands for campaign pages or site migrations)? Read `references/marketing-components.md` first — the prop-design rules there (one rich-text body over item arrays, buttons as prop pairs, shared token blocks) are what keep a small catalog able to express hundreds of pages.
+
 ## componentStaticProps.js
 
 **Important:** Use default import for package.json, not `import * as`.

@@ -91,9 +91,13 @@ For detailed manual deploy steps, see `references/deploy-workflow.md`.
 
 ### Build Status
 
-After pushing, the Limio platform automatically triggers a component build. The Storybook middleware proxies build status from `<limio-base-url>/api/component/builds`.
+After pushing, the Limio platform automatically triggers a component build (the push is mirrored to AWS CodeCommit and compiled by CodeBuild). The Storybook middleware proxies build status from `<limio-base-url>/api/component/builds`.
 
 Build statuses: `IN_PROGRESS`, `SUCCEEDED`, `FAILED`, `ERROR`
+
+Two verification rules: the endpoint reports the **most recent** build (match on your commit or on `startTime` after your push — don't assume the latest build is yours), and **check `logErrors` even when the build `SUCCEEDED`** — a single component can fail to compile while the batch passes, leaving stale code on live pages.
+
+For standalone scripts and CI (minting Bearer tokens outside Storybook, 1-hour token expiry, idempotent batch patterns, and the "what change triggers what build" table), see `references/api-automation.md`. For creating and publishing **pages** programmatically, use the **limio-pages** skill.
 
 ## Troubleshooting
 
