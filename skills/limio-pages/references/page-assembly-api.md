@@ -65,11 +65,29 @@ Exact schemas + a complete helper library for creating, building, and publishing
 
 ```javascript
 // lib.mjs — Limio page assembly helpers. Node 18+.
+// Auth is fully programmatic: tokens are minted from client credentials and
+// auto-refreshed — never ask the user to paste a Bearer token.
 import { randomUUID } from "node:crypto"
 
 const TENANT = process.env.LIMIO_TENANT       // e.g. https://acme.prod.limio.com
-const TOKEN  = process.env.LIMIO_TOKEN        // 1-hour OAuth bearer token
-const H = { Authorization: `Bearer ${TOKEN}`, "Content-Type": "application/json" }
+// client credentials: from env or the .limio.json written by limio-setup
+const CLIENT_ID = process.env.LIMIO_CLIENT_ID
+const CLIENT_SECRET = process.env.LIMIO_CLIENT_SECRET
+
+let _tok = null
+async function token() {
+  if (_tok && Date.now() < _tok.expiresAt - 60_000) return _tok.value // refresh 60s early
+  const r = await fetch(`${TENANT}/oauth2/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ grant_type: "client_credentials", client_id: CLIENT_ID, client_secret: CLIENT_SECRET }),
+  })
+  if (!r.ok) throw new Error(`token mint failed ${r.status}: ${await r.text()}`)
+  const { access_token, expires_in } = await r.json()
+  _tok = { value: access_token, expiresAt: Date.now() + (expires_in || 3600) * 1000 }
+  return _tok.value
+}
+const H = async () => ({ Authorization: `Bearer ${await token()}`, "Content-Type": "application/json" })
 
 export const custom = (name, position, props = {}) => ({
   path: `/custom-components-2/${name}`, id: randomUUID(), position,
@@ -78,12 +96,12 @@ export const custom = (name, position, props = {}) => ({
 })
 
 export async function job(body) {
-  const r = await fetch(`${TENANT}/limio/jobs`, { method: "POST", headers: H, body: JSON.stringify(body) })
+  const r = await fetch(`${TENANT}/limio/jobs`, { method: "POST", headers: await H(), body: JSON.stringify(body) })
   if (!r.ok) throw new Error(`job submit ${r.status}: ${await r.text()}`)
   const { id } = await r.json()
   for (let i = 0; i < 60; i++) {
     await new Promise((res) => setTimeout(res, 500))
-    const s = await (await fetch(`${TENANT}/limio/jobs/${id}`, { headers: H })).json()
+    const s = await (await fetch(`${TENANT}/limio/jobs/${id}`, { headers: await H() })).json()
     if (s.state === "completed") return
     if (s.state === "failed") throw new Error(s.failedReason || "job failed")
   }
@@ -109,7 +127,7 @@ export async function ensureTag(tagPath, displayName) {
 export async function upsertPage({ name, path, tag, attributes = {}, assets, pageStyle }) {
   await ensureTag(tag, name)
   const enc = encodeURIComponent(path.replace(/^\//, ""))
-  await fetch(`${TENANT}/limio/catalogs/1/items/${enc}`, { method: "DELETE", headers: H })
+  await fetch(`${TENANT}/limio/catalogs/1/items/${enc}`, { method: "DELETE", headers: await H() })
   await job({ jobType: "creation", updatePath: "/limio/catalogs/1/tree/pages",
     itemData: { name, record_type: "page", baseTemplate: "/config/templates/pages/default",
       path, tags: [tag], isAuthenticated: false, offers: [], attributes,
@@ -117,14 +135,14 @@ export async function upsertPage({ name, path, tag, attributes = {}, assets, pag
 }
 
 export async function buildPages(paths) {
-  const r = await (await fetch(`${TENANT}/api/shop/builds`, { method: "POST", headers: H,
+  const r = await (await fetch(`${TENANT}/api/shop/builds`, { method: "POST", headers: await H(),
     body: JSON.stringify({ items: paths }) })).json()
   if (!r.id) throw new Error("build not accepted: " + JSON.stringify(r))
   return r.id // buildId for publish
 }
 
 export async function publish(tags, buildId, name) {
-  const r = await (await fetch(`${TENANT}/api/publish`, { method: "POST", headers: H,
+  const r = await (await fetch(`${TENANT}/api/publish`, { method: "POST", headers: await H(),
     body: JSON.stringify({ tags, buildId, name }) })).json()
   const live = Object.keys(r.publishedData?.pages || {})
   const omitted = Object.keys(r.ommitedWithError?.pages || {})

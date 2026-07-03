@@ -65,7 +65,9 @@ Decision table:
 
 ## Auth for scripts
 
-OAuth client-credentials Bearer token (see docs: Authentication Overview). Tokens last **1 hour**: mint per run, never store in the repo, and rely on idempotent delete+recreate so an expiry mid-batch is recoverable by re-running with a fresh token.
+**Mint tokens programmatically — never ask the user to paste a Bearer token.** `POST <tenant>/oauth2/token` with `grant_type=client_credentials` returns a 1-hour token (docs: Authentication Overview). Client id/secret come from the `.limio.json` written by limio-setup, or env vars — if neither exists, ask the user for *credentials once* (or run limio-setup), not for tokens repeatedly.
+
+The helper library in `references/page-assembly-api.md` does this for you: caches the token, refreshes 60s before expiry, so long batches never 401. Keep scripts idempotent (delete + recreate) anyway, so any failure is recoverable by re-running.
 
 ## Pitfall checklist (scan before every run)
 
@@ -76,5 +78,5 @@ OAuth client-credentials Bearer token (see docs: Authentication Overview). Token
 | Props don't match limioProps ids | Component renders its defaults | Read the component package.json; match ids exactly |
 | Renamed a component prop id | Existing pages lose that prop's content | Treat prop ids as a contract; migrate page props when renaming |
 | Publishing too fast after build | Route omitted / stale | Wait for build completion, re-publish |
-| Token expired mid-batch | 401s halfway | Fresh token + re-run (idempotent scripts) |
+| Token expired mid-batch | 401s halfway | Mint from client credentials with auto-refresh (don't hand-feed tokens); idempotent re-run |
 | Missing npm dep in component package.json (e.g. `xss`) | Published page SSR-crashes / spinner | Declare every import in the component's `dependencies` |
