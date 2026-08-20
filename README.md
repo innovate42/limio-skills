@@ -1,6 +1,6 @@
 # Limio Skills for Claude Code
 
-A Claude Code plugin that gives Claude **five specialised skills** for the [Limio](https://limio.com) subscription management platform — from creating components to deploying them to your tenant.
+A Claude Code plugin that gives Claude **six specialised skills** for the [Limio](https://limio.com) subscription management platform — from creating components to deploying them to your tenant.
 
 | Skill | What it does | Audience |
 |-------|-------------|----------|
@@ -9,8 +9,9 @@ A Claude Code plugin that gives Claude **five specialised skills** for the [Limi
 | [`limio-story`](#limio-story--create-stories) | Generates Storybook stories with meaningful variations | Developers + Non-technical |
 | [`limio-storybook`](#limio-storybook--set-up-storybook-playground) | Sets up the full Storybook component playground | Developers |
 | [`limio-setup`](#limio-setup--connect--deploy) | Connects to a Limio tenant, manages credentials, and deploys | Developers + Non-technical |
+| [`migrate-form-lite`](#migrate-form-lite--migrate-ui-form-components) | Migrates components from `@limio/ui-form` to `@limio/form-lite` | Developers |
 
-All five skills are installed together as a single plugin. Each one activates automatically based on what you ask Claude to do — there's nothing extra to configure or enable per-skill.
+All six skills are installed together as a single plugin. Each one activates automatically based on what you ask Claude to do — there's nothing extra to configure or enable per-skill.
 
 ## Prerequisites
 
@@ -180,6 +181,28 @@ Deploy the pricing-cards component to Limio
 - Smart git deployment with conflict resolution
 - Build status tracking from Limio API
 - Region support: EU, US, Dev
+
+---
+
+### `migrate-form-lite` — Migrate ui-form Components
+
+**Audience:** Developers
+
+Migrates a custom component from `@limio/ui-form` (Redux two-way binding) to `@limio/form-lite` (uncontrolled, one-way flow) — required for components mounted inside the release-115 checkout form.
+
+**Example prompts:**
+```
+Migrate ch-media-address-fields-hup from ui-form to form-lite
+```
+```
+This component throws registerFormElement is not a function — migrate it
+```
+
+**What it provides:**
+- Mandatory pre-migration diff of the platform equivalent, so responsibilities moved to the backend (same-as-delivery copy, address1 concatenation, country sync) are deleted, not ported
+- Full import mapping and state-management patterns (uncontrolled fields, onChange bridge, programmatic DOM prefills)
+- Validation pitfalls: async `setCustomValidities`, `inert` during submit, `pattern=""` rejection
+- Sprint-version compatibility guidance, including a pre-115 test wrapper
 
 ---
 
